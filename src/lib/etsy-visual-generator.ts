@@ -247,32 +247,49 @@ export async function generateEtsyVisual(
 
   onProgress?.(2);
 
-  // === BACKGROUND: rich radial gradient + spotlight ===
+  // === BACKGROUND: rich multi-layer gradient ===
   const baseColor = bgColor || "#e91e8c";
   const grad = hexToGradient(baseColor);
 
-  // Base gradient
-  const bgGrad = ctx.createRadialGradient(SIZE / 2, SIZE * 0.35, 50, SIZE / 2, SIZE / 2, SIZE * 0.85);
+  // Base dark gradient
+  const bgGrad = ctx.createRadialGradient(SIZE / 2, SIZE * 0.3, 0, SIZE / 2, SIZE / 2, SIZE * 0.9);
   bgGrad.addColorStop(0, grad.mid);
-  bgGrad.addColorStop(0.6, grad.end);
+  bgGrad.addColorStop(0.5, grad.end);
   bgGrad.addColorStop(1, grad.start);
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, SIZE, SIZE);
 
-  // Spotlight glow at top-center
+  // Large warm spotlight behind pages area
   ctx.save();
-  const spotlight = ctx.createRadialGradient(SIZE / 2, 120, 0, SIZE / 2, 120, 500);
-  spotlight.addColorStop(0, "rgba(255,255,255,0.12)");
+  const spotlight = ctx.createRadialGradient(SIZE / 2, SIZE * 0.55, 0, SIZE / 2, SIZE * 0.55, SIZE * 0.6);
+  spotlight.addColorStop(0, "rgba(255,255,255,0.10)");
+  spotlight.addColorStop(0.5, "rgba(255,255,255,0.04)");
   spotlight.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = spotlight;
   ctx.fillRect(0, 0, SIZE, SIZE);
   ctx.restore();
 
-  // Subtle vignette
+  // Subtle bokeh-like circles for depth
   ctx.save();
-  const vignette = ctx.createRadialGradient(SIZE / 2, SIZE / 2, SIZE * 0.3, SIZE / 2, SIZE / 2, SIZE * 0.75);
+  ctx.globalAlpha = 0.04;
+  for (let i = 0; i < 8; i++) {
+    const bx = 100 + Math.sin(i * 1.7) * 400;
+    const by = 200 + Math.cos(i * 2.3) * 350;
+    const br = 80 + (i % 3) * 60;
+    const bokeh = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+    bokeh.addColorStop(0, "#fff");
+    bokeh.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = bokeh;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // Deep vignette for drama
+  ctx.save();
+  const vignette = ctx.createRadialGradient(SIZE / 2, SIZE / 2, SIZE * 0.25, SIZE / 2, SIZE / 2, SIZE * 0.72);
   vignette.addColorStop(0, "rgba(0,0,0,0)");
-  vignette.addColorStop(1, "rgba(0,0,0,0.35)");
+  vignette.addColorStop(1, "rgba(0,0,0,0.45)");
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, SIZE, SIZE);
   ctx.restore();
@@ -301,7 +318,36 @@ export async function generateEtsyVisual(
 
   onProgress?.(68);
 
-  // === LOGO (top, centered, large) ===
+  // === FLAGS (top-left corner) ===
+  const flagSize = 44;
+  const flagGap = 10;
+  let flagX = 28;
+  const flagY = 28;
+
+  for (const l of langs) {
+    try {
+      const flagImg = await loadImage(FLAG_URLS[l]);
+      const fh = flagSize * 0.67;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 8;
+      roundRect(ctx, flagX, flagY, flagSize, fh, 5);
+      ctx.clip();
+      ctx.drawImage(flagImg, flagX, flagY, flagSize, fh);
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.7)";
+      ctx.lineWidth = 1.5;
+      roundRect(ctx, flagX, flagY, flagSize, fh, 5);
+      ctx.stroke();
+      ctx.restore();
+    } catch { /* skip */ }
+    flagX += flagSize + flagGap;
+  }
+
+  onProgress?.(72);
+
+  // === LOGO (centered, VERY LARGE) ===
   const logoUrl = customLogoUrl && customLogoUrl.trim() !== "" ? customLogoUrl.trim() : setDetail.logo;
   let logoImg: HTMLImageElement | null = null;
   if (logoUrl) {
@@ -310,129 +356,115 @@ export async function generateEtsyVisual(
 
   const logoBottomY = (() => {
     if (logoImg) {
-      const maxLogoW = 600;
-      const maxLogoH = 180;
+      const maxLogoW = 780;
+      const maxLogoH = 260;
       const logoAspect = logoImg.width / logoImg.height;
       let logoW = maxLogoW;
       let logoH = logoW / logoAspect;
       if (logoH > maxLogoH) { logoH = maxLogoH; logoW = logoH * logoAspect; }
 
       const logoX = SIZE / 2 - logoW / 2;
-      const logoY = 40;
+      const logoY = 30;
 
-      // Glow behind logo
+      // Multi-layer glow
       ctx.save();
-      ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
-      ctx.shadowBlur = 50;
+      ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+      ctx.shadowBlur = 60;
       ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
       ctx.restore();
-      // Crisp logo on top
+      // Second glow pass for richness
+      ctx.save();
+      ctx.shadowColor = grad.mid;
+      ctx.shadowBlur = 80;
+      ctx.globalAlpha = 0.3;
+      ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+      // Crisp logo
       ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
 
       return logoY + logoH;
     } else {
-      // Fallback: set name
       ctx.save();
-      ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
-      ctx.shadowBlur = 30;
-      ctx.shadowOffsetY = 4;
+      ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+      ctx.shadowBlur = 40;
+      ctx.shadowOffsetY = 6;
       ctx.fillStyle = "#fff";
-      ctx.font = "bold 72px Arial, sans-serif";
+      ctx.font = "bold 86px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      ctx.fillText(setDetail.name, SIZE / 2, 55);
+      ctx.fillText(setDetail.name, SIZE / 2, 50);
       ctx.restore();
-      return 55 + 80;
+      return 50 + 100;
     }
   })();
 
-  onProgress?.(72);
-
-  // === FLAGS (centered, below logo) ===
-  const flagSize = 54;
-  const flagGap = 16;
-  const totalFlagsW = langs.length * flagSize + (langs.length - 1) * flagGap;
-  let flagX = SIZE / 2 - totalFlagsW / 2;
-  const flagY = logoBottomY + 20;
-
-  for (const l of langs) {
-    try {
-      const flagImg = await loadImage(FLAG_URLS[l]);
-      const fh = flagSize * 0.67;
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.4)";
-      ctx.shadowBlur = 10;
-      roundRect(ctx, flagX, flagY, flagSize, fh, 6);
-      ctx.clip();
-      ctx.drawImage(flagImg, flagX, flagY, flagSize, fh);
-      ctx.restore();
-      // Border
-      ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,0.6)";
-      ctx.lineWidth = 2;
-      roundRect(ctx, flagX, flagY, flagSize, fh, 6);
-      ctx.stroke();
-      ctx.restore();
-    } catch { /* skip */ }
-    flagX += flagSize + flagGap;
-  }
-
   onProgress?.(76);
 
-  // === STAGGERED CASCADE LAYOUT: 4 large pages, each lower than previous ===
-  const pageW = 340;
-  const pageH = 480;
+  // === STAGGERED CASCADE: 4 large pages, dramatic overlap ===
+  const pageW = 360;
+  const pageH = 508;
   const fanCenterX = SIZE / 2;
-  const fanBaseY = flagY + 50;
-  const spacing = 180; // horizontal spacing between pages
-  const verticalStep = 45; // each page is this much lower than the previous
-  const rotations = [-10, -3, 3, 10];
+  const fanBaseY = logoBottomY + 15;
+  const spacing = 175;
+  const verticalStep = 40;
+  const rotations = [-11, -3.5, 3.5, 11];
   const pages = [gradedPage, completePage, masterPage, grayscalePage];
   const labels = ["Graded Set", "Complete Set", "Master Set", "Grayscale"];
   const colors = ["#ef4444", "#f97316", "#3b82f6", "#8b5cf6"];
 
-  // Calculate positions: centered horizontally, staggered vertically
   const totalFanW = (pages.length - 1) * spacing;
   const startX = fanCenterX - totalFanW / 2 - pageW / 2;
 
-  // First pass: draw all pages (back to front)
+  // Draw all pages back to front
   for (let i = 0; i < pages.length; i++) {
     const px = startX + i * spacing;
     const py = fanBaseY + i * verticalStep;
     drawPageOnCanvas(ctx, pages[i], px, py, pageW, pageH, rotations[i]);
   }
 
-  // Second pass: draw all badges ON TOP of all pages
+  // Draw all badges ON TOP
   for (let i = 0; i < pages.length; i++) {
     const px = startX + i * spacing;
     const py = fanBaseY + i * verticalStep;
     const badgeCx = px + pageW / 2;
-    const badgeCy = py + pageH - 10;
+    const badgeCy = py + pageH - 15;
     drawBadge(ctx, labels[i], badgeCx, badgeCy, colors[i], rotations[i]);
   }
 
   onProgress?.(88);
 
-  // === BOTTOM BANNER ===
+  // === PREMIUM BOTTOM BANNER ===
   ctx.save();
-  // Semi-transparent dark bar
-  const bannerH = 80;
+  const bannerH = 90;
   const bannerY = SIZE - bannerH;
-  ctx.fillStyle = "rgba(0,0,0,0.4)";
+
+  // Gradient banner background
+  const bannerGrad = ctx.createLinearGradient(0, bannerY, 0, SIZE);
+  bannerGrad.addColorStop(0, "rgba(0,0,0,0.0)");
+  bannerGrad.addColorStop(0.3, "rgba(0,0,0,0.5)");
+  bannerGrad.addColorStop(1, "rgba(0,0,0,0.7)");
+  ctx.fillStyle = bannerGrad;
   ctx.fillRect(0, bannerY, SIZE, bannerH);
 
-  // Top highlight line
-  ctx.fillStyle = "rgba(255,255,255,0.15)";
-  ctx.fillRect(0, bannerY, SIZE, 2);
+  // Accent line
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.fillRect(0, bannerY + 10, SIZE, 1);
 
-  // CTA text
-  ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-  ctx.shadowBlur = 10;
+  // CTA text with glow
+  ctx.shadowColor = "rgba(255,255,255,0.3)";
+  ctx.shadowBlur = 20;
   ctx.fillStyle = "#fff";
-  ctx.font = "bold 42px Arial, sans-serif";
+  ctx.font = "bold 44px Arial, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("✨ Instant Digital Download ✨", SIZE / 2, bannerY + bannerH / 2);
+  ctx.fillText("✨ Instant Digital Download ✨", SIZE / 2, bannerY + bannerH / 2 + 5);
+
+  // Subtle subtext
+  ctx.shadowColor = "transparent";
+  ctx.font = "20px Arial, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.fillText("Placeholders + Checklist  •  Color & Grayscale", SIZE / 2, bannerY + bannerH / 2 + 32);
   ctx.restore();
 
   onProgress?.(95);

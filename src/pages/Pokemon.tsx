@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { fetchIllustrators, fetchCardsByIllustrator, type Lang, type CardListItem } from "@/lib/tcgdex-api";
-import { Loader2, Paintbrush, Search, ArrowLeft } from "lucide-react";
+import { fetchPokemonNames, fetchCardsByPokemonName, type Lang, type CardListItem } from "@/lib/tcgdex-api";
+import { Loader2, Search, ArrowLeft, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { NavLink } from "@/components/NavLink";
 import { IllustratorEtsyDialog } from "@/components/IllustratorEtsyDialog";
@@ -19,31 +19,30 @@ const LANGS: { value: Lang; label: string }[] = [
   { value: "ja", label: "日本語" },
 ];
 
-const Illustrators = () => {
+const Pokemon = () => {
   const [lang, setLang] = useState<Lang>("fr");
-  const [illustrators, setIllustrators] = useState<string[]>([]);
-  const [filteredIllustrators, setFilteredIllustrators] = useState<string[]>([]);
+  const [pokemonNames, setPokemonNames] = useState<string[]>([]);
+  const [filteredNames, setFilteredNames] = useState<string[]>([]);
   const [search, setSearch] = useState("");
-  const [selectedIllustrator, setSelectedIllustrator] = useState<string | null>(null);
+  const [selectedPokemon, setSelectedPokemon] = useState<string | null>(null);
   const [cards, setCards] = useState<CardListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingCards, setLoadingCards] = useState(false);
 
   const handleLoad = useCallback(async () => {
     setLoading(true);
-    setIllustrators([]);
-    setFilteredIllustrators([]);
-    setSelectedIllustrator(null);
+    setPokemonNames([]);
+    setFilteredNames([]);
+    setSelectedPokemon(null);
     setCards([]);
     setSearch("");
     try {
-      const data = await fetchIllustrators(lang);
-      const sorted = data.sort((a, b) => a.localeCompare(b));
-      setIllustrators(sorted);
-      setFilteredIllustrators(sorted);
-      toast.success(`${sorted.length} illustrateurs chargés`);
+      const data = await fetchPokemonNames(lang);
+      setPokemonNames(data);
+      setFilteredNames(data);
+      toast.success(`${data.length} Pokémon chargés`);
     } catch (e) {
-      toast.error("Erreur lors du chargement des illustrateurs");
+      toast.error("Erreur lors du chargement des Pokémon");
       console.error(e);
     }
     setLoading(false);
@@ -52,38 +51,39 @@ const Illustrators = () => {
   const handleSearch = (value: string) => {
     setSearch(value);
     const q = value.toLowerCase();
-    setFilteredIllustrators(
-      illustrators.filter((name) => name.toLowerCase().includes(q))
+    setFilteredNames(
+      pokemonNames.filter((name) => name.toLowerCase().includes(q))
     );
   };
 
-  const handleSelectIllustrator = useCallback(async (name: string) => {
-    setSelectedIllustrator(name);
+  const handleSelectPokemon = useCallback(async (name: string) => {
+    setSelectedPokemon(name);
     setLoadingCards(true);
     try {
-      const data = await fetchCardsByIllustrator(lang, name);
+      const data = await fetchCardsByPokemonName(lang, name);
       setCards(data);
-      toast.success(`${data.length} cartes par ${name}`);
+      toast.success(`${data.length} cartes de ${name}`);
     } catch (e) {
       toast.error("Erreur lors du chargement des cartes");
       console.error(e);
     }
     setLoadingCards(false);
   }, [lang]);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div className="flex items-center gap-2">
-            <Paintbrush className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-display font-bold text-foreground">Illustrateurs</h1>
+            <Sparkles className="h-6 w-6 text-primary" />
+            <h1 className="text-xl font-display font-bold text-foreground">Pokémon</h1>
           </div>
           <div className="flex flex-wrap items-center gap-3 ml-auto">
             <NavLink to="/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
               <ArrowLeft className="h-4 w-4" /> Explorer
             </NavLink>
-            <NavLink to="/pokemon" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
-              Pokémon
+            <NavLink to="/illustrators" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+              Illustrateurs
             </NavLink>
             <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
               <SelectTrigger className="w-[140px]">
@@ -97,11 +97,11 @@ const Illustrators = () => {
             </Select>
             <Button onClick={handleLoad} disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Charger les illustrateurs
+              Charger les Pokémon
             </Button>
             <IllustratorEtsyDialog
-              entityName={selectedIllustrator}
-              entityLabel="Illustrateur"
+              entityName={selectedPokemon}
+              entityLabel="Pokémon"
               cards={cards}
               lang={lang}
               disabled={cards.length === 0}
@@ -111,40 +111,39 @@ const Illustrators = () => {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        {illustrators.length === 0 && !loading && (
+        {pokemonNames.length === 0 && !loading && (
           <div className="flex flex-col items-center justify-center py-32 text-center">
-            <Paintbrush className="h-16 w-16 text-muted-foreground/30 mb-4" />
-            <h2 className="font-display text-2xl font-bold text-foreground mb-2">Illustrateurs</h2>
+            <Sparkles className="h-16 w-16 text-muted-foreground/30 mb-4" />
+            <h2 className="font-display text-2xl font-bold text-foreground mb-2">Pokémon</h2>
             <p className="text-muted-foreground max-w-md">
-              Parcourez tous les illustrateurs de cartes Pokémon TCG. Sélectionnez une langue puis cliquez sur "Charger les illustrateurs".
+              Parcourez tous les Pokémon du TCG. Sélectionnez une langue puis cliquez sur "Charger les Pokémon".
             </p>
           </div>
         )}
 
-        {illustrators.length > 0 && (
+        {pokemonNames.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
-            {/* Illustrators list */}
             <div className="bg-card rounded-lg p-4 card-glow">
               <div className="relative mb-3">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Rechercher un illustrateur..."
+                  placeholder="Rechercher un Pokémon..."
                   value={search}
                   onChange={(e) => handleSearch(e.target.value)}
                   className="pl-9"
                 />
               </div>
               <p className="text-xs text-muted-foreground mb-2">
-                {filteredIllustrators.length} illustrateur{filteredIllustrators.length > 1 ? "s" : ""}
+                {filteredNames.length} Pokémon
               </p>
               <ScrollArea className="h-[calc(100vh-280px)]">
                 <div className="space-y-1 pr-3">
-                  {filteredIllustrators.map((name) => (
+                  {filteredNames.map((name) => (
                     <button
                       key={name}
-                      onClick={() => handleSelectIllustrator(name)}
+                      onClick={() => handleSelectPokemon(name)}
                       className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                        selectedIllustrator === name
+                        selectedPokemon === name
                           ? "bg-primary text-primary-foreground font-semibold"
                           : "hover:bg-muted text-foreground"
                       }`}
@@ -156,11 +155,10 @@ const Illustrators = () => {
               </ScrollArea>
             </div>
 
-            {/* Cards area */}
             <div>
-              {selectedIllustrator && (
+              {selectedPokemon && (
                 <div className="mb-4">
-                  <h2 className="font-display text-xl font-bold text-foreground">{selectedIllustrator}</h2>
+                  <h2 className="font-display text-xl font-bold text-foreground">{selectedPokemon}</h2>
                   <p className="text-sm text-muted-foreground">
                     {loadingCards ? "Chargement..." : `${cards.length} carte${cards.length > 1 ? "s" : ""}`}
                   </p>
@@ -211,19 +209,18 @@ const Illustrators = () => {
                 </div>
               )}
 
-              {!loadingCards && !selectedIllustrator && (
+              {!loadingCards && !selectedPokemon && (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Paintbrush className="h-12 w-12 text-muted-foreground/20 mb-3" />
-                  <p className="text-muted-foreground">Sélectionnez un illustrateur pour voir ses cartes</p>
+                  <Sparkles className="h-12 w-12 text-muted-foreground/20 mb-3" />
+                  <p className="text-muted-foreground">Sélectionnez un Pokémon pour voir ses cartes</p>
                 </div>
               )}
             </div>
           </div>
         )}
       </div>
-
     </div>
   );
 };
 
-export default Illustrators;
+export default Pokemon;

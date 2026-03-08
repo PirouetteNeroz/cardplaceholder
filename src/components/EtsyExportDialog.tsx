@@ -444,7 +444,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
           <div className="space-y-4 py-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              Fichier {currentFileIndex} / {selectedModes.length * colorModes.length}
+              Fichier {currentFileIndex} / {selectedModes.length * colorModes.length * selectedPdfLangs.length}
             </div>
             <Progress value={progress} className="h-3" />
             <p className="text-sm text-muted-foreground text-center">{currentStep}</p>

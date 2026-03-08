@@ -433,22 +433,17 @@ export async function generateEtsyVisual(
 
   onProgress?.(88);
 
-  // === PREMIUM BOTTOM BANNER ===
+  // === PREMIUM BOTTOM BANNER (raised) ===
   ctx.save();
-  const bannerH = 90;
-  const bannerY = SIZE - bannerH;
+  const bannerH = 80;
+  const bannerY = SIZE - bannerH - 15;
 
-  // Gradient banner background
-  const bannerGrad = ctx.createLinearGradient(0, bannerY, 0, SIZE);
+  const bannerGrad = ctx.createLinearGradient(0, bannerY - 15, 0, SIZE);
   bannerGrad.addColorStop(0, "rgba(0,0,0,0.0)");
   bannerGrad.addColorStop(0.3, "rgba(0,0,0,0.5)");
   bannerGrad.addColorStop(1, "rgba(0,0,0,0.7)");
   ctx.fillStyle = bannerGrad;
-  ctx.fillRect(0, bannerY, SIZE, bannerH);
-
-  // Accent line
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
-  ctx.fillRect(0, bannerY + 10, SIZE, 1);
+  ctx.fillRect(0, bannerY - 15, SIZE, bannerH + 30);
 
   // CTA text with glow
   ctx.shadowColor = "rgba(255,255,255,0.3)";
@@ -457,7 +452,7 @@ export async function generateEtsyVisual(
   ctx.font = "bold 44px Arial, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("✨ Instant Digital Download ✨", SIZE / 2, bannerY + bannerH / 2 + 5);
+  ctx.fillText("✨ Instant Digital Download ✨", SIZE / 2, bannerY + bannerH / 2 - 2);
 
   // Subtle subtext
   ctx.shadowColor = "transparent";

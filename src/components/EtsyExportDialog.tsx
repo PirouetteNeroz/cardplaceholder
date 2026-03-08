@@ -465,6 +465,20 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
                 ))}
               </div>
 
+              {/* Custom logo URL */}
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  {setDetail?.logo ? "Logo détecté ✓ — URL personnalisée (optionnel) :" : "⚠️ Pas de logo trouvé — Ajouter une URL :"}
+                </p>
+                <Input
+                  type="url"
+                  placeholder="https://example.com/logo.png"
+                  value={customLogoUrl}
+                  onChange={(e) => setCustomLogoUrl(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+
               {generatingVisual && (
                 <div className="space-y-2">
                   <Progress value={visualProgress} className="h-2" />

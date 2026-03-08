@@ -226,6 +226,7 @@ const Index = () => {
               <Download className="mr-2 h-4 w-4" />
               PDF
             </Button>
+            <EtsyExportDialog setDetail={setDetail} lang={lang} disabled={!setDetail} />
           </div>
         </div>
       </header>

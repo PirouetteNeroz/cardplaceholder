@@ -241,6 +241,18 @@ const Index = () => {
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Charger les séries
             </Button>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="maxPages" className="text-xs text-muted-foreground whitespace-nowrap">Pages max/PDF</Label>
+              <Input
+                id="maxPages"
+                type="number"
+                min={1}
+                max={50}
+                value={maxPagesPerPDF}
+                onChange={(e) => setMaxPagesPerPDF(Math.max(1, parseInt(e.target.value) || 6))}
+                className="w-[70px] h-9"
+              />
+            </div>
             <Button variant="outline" onClick={handleExportPDF} disabled={processedCards.length === 0}>
               <Download className="mr-2 h-4 w-4" />
               PDF

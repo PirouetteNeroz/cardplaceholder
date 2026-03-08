@@ -188,7 +188,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
           const colorSuffix = isGrayscale ? "_nb" : "";
           const suffix = totalParts > 1 ? `_part${part + 1}` : "";
           files.push({
-            name: `${illustratorName}${colorSuffix}${suffix}.pdf`,
+            name: `${entityName}${colorSuffix}${suffix}.pdf`,
             blob: doc.output("blob"),
           });
         }

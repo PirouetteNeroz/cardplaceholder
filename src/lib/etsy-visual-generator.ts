@@ -379,24 +379,25 @@ export async function generateEtsyVisual(
 
   onProgress?.(76);
 
-  // === FAN LAYOUT: 4 pages in cascade left→right ===
-  const pageW = 280;
-  const pageH = 396;
+  // === STAGGERED CASCADE LAYOUT: 4 large pages, each lower than previous ===
+  const pageW = 340;
+  const pageH = 480;
   const fanCenterX = SIZE / 2;
-  const fanBaseY = flagY + 70;
-  const spacing = 195; // horizontal spacing between pages
-  const rotations = [-12, -4, 4, 12];
+  const fanBaseY = flagY + 50;
+  const spacing = 180; // horizontal spacing between pages
+  const verticalStep = 45; // each page is this much lower than the previous
+  const rotations = [-10, -3, 3, 10];
   const pages = [gradedPage, completePage, masterPage, grayscalePage];
   const labels = ["Graded Set", "Complete Set", "Master Set", "Grayscale"];
   const colors = ["#ef4444", "#f97316", "#3b82f6", "#8b5cf6"];
 
-  // Calculate positions: centered fan
+  // Calculate positions: centered horizontally, staggered vertically
   const totalFanW = (pages.length - 1) * spacing;
   const startX = fanCenterX - totalFanW / 2 - pageW / 2;
 
   for (let i = 0; i < pages.length; i++) {
     const px = startX + i * spacing;
-    const py = fanBaseY + Math.abs(rotations[i]) * 2; // slight vertical offset for outer pages
+    const py = fanBaseY + i * verticalStep; // staggered: each page lower
 
     drawPageOnCanvas(ctx, pages[i], px, py, pageW, pageH, rotations[i]);
 

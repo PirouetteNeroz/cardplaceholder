@@ -219,6 +219,30 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
                 </div>
               ))}
             </div>
+
+            <div className="border-t pt-3">
+              <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                <Palette className="h-4 w-4" /> Format de couleur :
+              </p>
+              <div className="flex gap-3">
+                <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors flex-1">
+                  <Checkbox
+                    id="color-mode"
+                    checked={colorModes.includes("color")}
+                    onCheckedChange={() => toggleColorMode("color")}
+                  />
+                  <Label htmlFor="color-mode" className="font-medium cursor-pointer">Couleur</Label>
+                </div>
+                <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors flex-1">
+                  <Checkbox
+                    id="grayscale-mode"
+                    checked={colorModes.includes("grayscale")}
+                    onCheckedChange={() => toggleColorMode("grayscale")}
+                  />
+                  <Label htmlFor="grayscale-mode" className="font-medium cursor-pointer">Nuances de gris</Label>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

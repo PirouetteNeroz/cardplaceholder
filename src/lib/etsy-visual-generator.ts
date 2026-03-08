@@ -364,7 +364,7 @@ export async function generateEtsyVisual(
       if (logoH > maxLogoH) { logoH = maxLogoH; logoW = logoH * logoAspect; }
 
       const logoX = SIZE / 2 - logoW / 2;
-      const logoY = 30;
+      const logoY = 65;
 
       // Multi-layer glow
       ctx.save();
@@ -372,7 +372,6 @@ export async function generateEtsyVisual(
       ctx.shadowBlur = 60;
       ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
       ctx.restore();
-      // Second glow pass for richness
       ctx.save();
       ctx.shadowColor = grad.mid;
       ctx.shadowBlur = 80;
@@ -401,14 +400,14 @@ export async function generateEtsyVisual(
 
   onProgress?.(76);
 
-  // === STAGGERED CASCADE: 4 large pages, dramatic overlap ===
-  const pageW = 360;
-  const pageH = 508;
+  // === STAGGERED CASCADE: 4 tall pages, nearly straight ===
+  const pageW = 310;
+  const pageH = 560;
   const fanCenterX = SIZE / 2;
-  const fanBaseY = logoBottomY + 15;
-  const spacing = 175;
-  const verticalStep = 40;
-  const rotations = [-11, -3.5, 3.5, 11];
+  const fanBaseY = logoBottomY + 5;
+  const spacing = 180;
+  const verticalStep = 22;
+  const rotations = [-1.5, -0.5, 0.5, 1.5];
   const pages = [gradedPage, completePage, masterPage, grayscalePage];
   const labels = ["Graded Set", "Complete Set", "Master Set", "Grayscale"];
   const colors = ["#ef4444", "#f97316", "#3b82f6", "#8b5cf6"];
@@ -434,22 +433,17 @@ export async function generateEtsyVisual(
 
   onProgress?.(88);
 
-  // === PREMIUM BOTTOM BANNER ===
+  // === PREMIUM BOTTOM BANNER (raised) ===
   ctx.save();
-  const bannerH = 90;
-  const bannerY = SIZE - bannerH;
+  const bannerH = 80;
+  const bannerY = SIZE - bannerH - 15;
 
-  // Gradient banner background
-  const bannerGrad = ctx.createLinearGradient(0, bannerY, 0, SIZE);
+  const bannerGrad = ctx.createLinearGradient(0, bannerY - 15, 0, SIZE);
   bannerGrad.addColorStop(0, "rgba(0,0,0,0.0)");
   bannerGrad.addColorStop(0.3, "rgba(0,0,0,0.5)");
   bannerGrad.addColorStop(1, "rgba(0,0,0,0.7)");
   ctx.fillStyle = bannerGrad;
-  ctx.fillRect(0, bannerY, SIZE, bannerH);
-
-  // Accent line
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
-  ctx.fillRect(0, bannerY + 10, SIZE, 1);
+  ctx.fillRect(0, bannerY - 15, SIZE, bannerH + 30);
 
   // CTA text with glow
   ctx.shadowColor = "rgba(255,255,255,0.3)";
@@ -458,7 +452,7 @@ export async function generateEtsyVisual(
   ctx.font = "bold 44px Arial, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("✨ Instant Digital Download ✨", SIZE / 2, bannerY + bannerH / 2 + 5);
+  ctx.fillText("✨ Instant Digital Download ✨", SIZE / 2, bannerY + bannerH / 2 - 2);
 
   // Subtle subtext
   ctx.shadowColor = "transparent";

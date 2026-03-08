@@ -50,6 +50,7 @@ const Index = () => {
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfProgress, setPdfProgress] = useState(0);
   const [pdfStep, setPdfStep] = useState("");
+  const [maxPagesPerPDF, setMaxPagesPerPDF] = useState(6);
 
   const handleLoadSeries = useCallback(async () => {
     setLoading(true);

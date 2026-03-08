@@ -15,13 +15,14 @@ interface GeneratedFile {
 }
 
 interface Props {
-  illustratorName: string | null;
+  entityName: string | null;
+  entityLabel?: string;
   cards: CardListItem[];
   lang: Lang;
   disabled?: boolean;
 }
 
-export function IllustratorEtsyDialog({ illustratorName, cards, lang, disabled }: Props) {
+export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur", cards, lang, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [colorModes, setColorModes] = useState<("color" | "grayscale")[]>(["color"]);
   const [generating, setGenerating] = useState(false);
@@ -37,7 +38,7 @@ export function IllustratorEtsyDialog({ illustratorName, cards, lang, disabled }
   };
 
   const handleGenerate = async () => {
-    if (!illustratorName || cards.length === 0 || colorModes.length === 0) return;
+    if (!entityName || cards.length === 0 || colorModes.length === 0) return;
     setGenerating(true);
     setGeneratedFiles([]);
     const files: GeneratedFile[] = [];
@@ -67,10 +68,9 @@ export function IllustratorEtsyDialog({ illustratorName, cards, lang, disabled }
           // Cover page
           doc.setFontSize(32);
           doc.setFont("helvetica", "bold");
-          doc.text(illustratorName, 105, 60, { align: "center" });
+          doc.text(entityName, 105, 60, { align: "center" });
           doc.setFontSize(18);
-          doc.setFont("helvetica", "normal");
-          doc.text("Illustrateur Pokémon TCG", 105, 75, { align: "center" });
+          doc.text(`${entityLabel} Pokémon TCG`, 105, 75, { align: "center" });
           doc.setFontSize(14);
           doc.text(`Cartes: ${cards.length}`, 30, 200);
           doc.text(`Langue: ${lang.toUpperCase()}`, 30, 210);
@@ -188,7 +188,7 @@ export function IllustratorEtsyDialog({ illustratorName, cards, lang, disabled }
           const colorSuffix = isGrayscale ? "_nb" : "";
           const suffix = totalParts > 1 ? `_part${part + 1}` : "";
           files.push({
-            name: `${illustratorName}${colorSuffix}${suffix}.pdf`,
+            name: `${entityName}${colorSuffix}${suffix}.pdf`,
             blob: doc.output("blob"),
           });
         }
@@ -230,7 +230,7 @@ export function IllustratorEtsyDialog({ illustratorName, cards, lang, disabled }
         <DialogHeader>
           <DialogTitle className="font-display flex items-center gap-2">
             <ShoppingBag className="h-5 w-5 text-primary" />
-            Export Etsy — {illustratorName || "Illustrateur"}
+            Export Etsy — {entityName || entityLabel}
           </DialogTitle>
         </DialogHeader>
 

@@ -279,7 +279,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
 
         <DialogFooter>
           {!generating && generatedFiles.length === 0 && (
-            <Button onClick={handleGenerate} disabled={selectedModes.length === 0}>
+            <Button onClick={handleGenerate} disabled={selectedModes.length === 0 || colorModes.length === 0}>
               Générer {selectedModes.length > 0 && colorModes.length > 0 && `(${selectedModes.length * colorModes.length})`}
             </Button>
           )}
@@ -290,7 +290,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
             </Button>
           )}
           {!generating && generatedFiles.length > 0 && (
-            <Button variant="outline" onClick={() => { setGeneratedFiles([]); setSelectedModes([]); setProgress(0); }}>
+            <Button variant="outline" onClick={() => { setGeneratedFiles([]); setSelectedModes([]); setColorModes(["color"]); setProgress(0); }}>
               Nouveau export
             </Button>
           )}

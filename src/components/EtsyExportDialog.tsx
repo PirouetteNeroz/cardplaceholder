@@ -73,6 +73,15 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   const [selectedVisualLangs, setSelectedVisualLangs] = useState<Lang[]>([lang]);
   const [visualPreview, setVisualPreview] = useState<string | null>(null);
 
+  // PNG page export state
+  const [pngModes, setPngModes] = useState<ExportMode[]>([]);
+  const [pngLangs, setPngLangs] = useState<Lang[]>([lang]);
+  const [pngColorModes, setPngColorModes] = useState<("color" | "grayscale")[]>(["color"]);
+  const [pngPage, setPngPage] = useState(1);
+  const [generatingPng, setGeneratingPng] = useState(false);
+  const [pngProgress, setPngProgress] = useState(0);
+  const [pngStep, setPngStep] = useState("");
+
   // Preview state
   const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null);
   const [previewPage, setPreviewPage] = useState(0);

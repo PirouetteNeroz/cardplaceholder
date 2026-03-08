@@ -120,6 +120,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
                 reverse: card.reverse,
                 reverseType: card.reverseType,
                 graded: card.graded,
+                grayscale: isGrayscale,
               });
               if (dataUrl) {
                 doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);

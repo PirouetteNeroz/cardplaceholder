@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import type { ExportMode, SetDetail, Lang } from "@/lib/tcgdex-api";
 import { processCards } from "@/lib/tcgdex-api";
 import { toast } from "sonner";
+import { loadCardWithOverlays } from "@/lib/pdf-utils";
 
 const MODES: { value: ExportMode; label: string; description: string }[] = [
   { value: "complete", label: "Complete Set", description: "Toutes les cartes du set" },

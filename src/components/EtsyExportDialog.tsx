@@ -491,6 +491,116 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
               </Button>
             </div>
 
+            {/* === PNG Page Export Section === */}
+            <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <FileImage className="h-4 w-4 text-primary" />
+                Export PNG d'une page
+              </h3>
+
+              {/* Mode selection */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Modes :</p>
+                <div className="flex flex-wrap gap-2">
+                  {MODES.map((m) => (
+                    <button
+                      key={m.value}
+                      onClick={() => togglePngMode(m.value)}
+                      className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                        pngModes.includes(m.value)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-foreground border-border hover:bg-muted"
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Language selection */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">🌍 Langues :</p>
+                <div className="flex flex-wrap gap-2">
+                  {AVAILABLE_LANGS.map((l) => (
+                    <button
+                      key={l.value}
+                      onClick={() => togglePngLang(l.value)}
+                      className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                        pngLangs.includes(l.value)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-foreground border-border hover:bg-muted"
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Color mode */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Palette className="h-3 w-3" /> Couleur :
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => togglePngColorMode("color")}
+                    className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                      pngColorModes.includes("color")
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    Couleur
+                  </button>
+                  <button
+                    onClick={() => togglePngColorMode("grayscale")}
+                    className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                      pngColorModes.includes("grayscale")
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    N&B
+                  </button>
+                </div>
+              </div>
+
+              {/* Page number */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Numéro de page :</p>
+                <Input
+                  type="number"
+                  min={1}
+                  value={pngPage}
+                  onChange={(e) => setPngPage(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-24 h-8 text-sm"
+                />
+              </div>
+
+              {generatingPng && (
+                <div className="space-y-2">
+                  <Progress value={pngProgress} className="h-2" />
+                  <p className="text-xs text-muted-foreground text-center">{pngStep}</p>
+                </div>
+              )}
+
+              <Button
+                size="sm"
+                onClick={handleGeneratePng}
+                disabled={generatingPng || pngModes.length === 0 || pngLangs.length === 0 || pngColorModes.length === 0}
+                className="w-full"
+              >
+                {generatingPng ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <FileImage className="mr-2 h-4 w-4" />
+                )}
+                Générer PNG page {pngPage}
+              </Button>
+            </div>
+
             {/* === PDF Export Section === */}
             <div className="border-t pt-4">
               <p className="text-sm text-muted-foreground mb-3">

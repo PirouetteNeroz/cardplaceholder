@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { ShoppingBag, Download, Loader2, CheckCircle2 } from "lucide-react";
+import { ShoppingBag, Download, Loader2, CheckCircle2, Palette } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { ExportMode, SetDetail, Lang } from "@/lib/tcgdex-api";
 import { processCards } from "@/lib/tcgdex-api";
@@ -32,6 +32,7 @@ interface Props {
 export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [selectedModes, setSelectedModes] = useState<ExportMode[]>([]);
+  const [colorModes, setColorModes] = useState<("color" | "grayscale")[]>(["color"]);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState("");
@@ -44,24 +45,35 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
     );
   };
 
+  const toggleColorMode = (cm: "color" | "grayscale") => {
+    setColorModes((prev) =>
+      prev.includes(cm) ? prev.filter((c) => c !== cm) : [...prev, cm]
+    );
+  };
+
   const handleGenerate = async () => {
-    if (!setDetail || selectedModes.length === 0) return;
+    if (!setDetail || selectedModes.length === 0 || colorModes.length === 0) return;
     setGenerating(true);
     setGeneratedFiles([]);
     const files: GeneratedFile[] = [];
+    const totalJobs = selectedModes.length * colorModes.length;
+    let jobIndex = 0;
 
-    for (let i = 0; i < selectedModes.length; i++) {
-      const mode = selectedModes[i];
-      setCurrentFileIndex(i + 1);
-      setCurrentStep(`Traitement des cartes (${MODES.find(m => m.value === mode)?.label})...`);
-      setProgress(0);
+    for (const mode of selectedModes) {
+      for (const colorMode of colorModes) {
+        jobIndex++;
+        const isGrayscale = colorMode === "grayscale";
+        const colorLabel = isGrayscale ? "N&B" : "Couleur";
+        setCurrentFileIndex(jobIndex);
+        setCurrentStep(`Traitement (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
+        setProgress(0);
 
       try {
         const cards = await processCards(lang, setDetail, mode, (pct) => {
           setProgress(pct * 0.3);
         });
 
-        setCurrentStep(`Génération du PDF (${MODES.find(m => m.value === mode)?.label})...`);
+        setCurrentStep(`Génération du PDF (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
         const { jsPDF } = await import("jspdf");
 
         const cardsPerPage = 9;
@@ -108,6 +120,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
                 reverse: card.reverse,
                 reverseType: card.reverseType,
                 graded: card.graded,
+                grayscale: isGrayscale,
               });
               if (dataUrl) {
                 doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
@@ -132,10 +145,11 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
             setProgress(30 + globalProgress * 70);
           }
 
+          const colorSuffix = isGrayscale ? "_nb" : "";
           const suffix = totalParts > 1 ? `_part${part + 1}` : "";
           const pdfBlob = doc.output("blob");
           files.push({
-            name: `${setDetail.name}_${mode}${suffix}.pdf`,
+            name: `${setDetail.name}_${mode}${colorSuffix}${suffix}.pdf`,
             mode,
             blob: pdfBlob,
           });
@@ -143,6 +157,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
       } catch (e) {
         console.error(e);
         toast.error(`Erreur pour le mode ${mode}`);
+      }
       }
     }
 
@@ -204,6 +219,30 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
                 </div>
               ))}
             </div>
+
+            <div className="border-t pt-3">
+              <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                <Palette className="h-4 w-4" /> Format de couleur :
+              </p>
+              <div className="flex gap-3">
+                <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors flex-1">
+                  <Checkbox
+                    id="color-mode"
+                    checked={colorModes.includes("color")}
+                    onCheckedChange={() => toggleColorMode("color")}
+                  />
+                  <Label htmlFor="color-mode" className="font-medium cursor-pointer">Couleur</Label>
+                </div>
+                <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors flex-1">
+                  <Checkbox
+                    id="grayscale-mode"
+                    checked={colorModes.includes("grayscale")}
+                    onCheckedChange={() => toggleColorMode("grayscale")}
+                  />
+                  <Label htmlFor="grayscale-mode" className="font-medium cursor-pointer">Nuances de gris</Label>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -211,7 +250,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
           <div className="space-y-4 py-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              Fichier {currentFileIndex} / {selectedModes.length}
+              Fichier {currentFileIndex} / {selectedModes.length * colorModes.length}
             </div>
             <Progress value={progress} className="h-3" />
             <p className="text-sm text-muted-foreground text-center">{currentStep}</p>
@@ -225,8 +264,8 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
               {generatedFiles.length} fichier(s) prêt(s) !
             </div>
             <div className="space-y-2">
-              {generatedFiles.map((file) => (
-                <div key={file.mode} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+              {generatedFiles.map((file, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
                   <span className="text-sm font-medium">{file.name}</span>
                   <Button size="sm" variant="outline" onClick={() => handleDownload(file)}>
                     <Download className="h-3 w-3 mr-1" />
@@ -240,8 +279,8 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
 
         <DialogFooter>
           {!generating && generatedFiles.length === 0 && (
-            <Button onClick={handleGenerate} disabled={selectedModes.length === 0}>
-              Générer {selectedModes.length > 0 && `(${selectedModes.length})`}
+            <Button onClick={handleGenerate} disabled={selectedModes.length === 0 || colorModes.length === 0}>
+              Générer {selectedModes.length > 0 && colorModes.length > 0 && `(${selectedModes.length * colorModes.length})`}
             </Button>
           )}
           {!generating && generatedFiles.length > 1 && (
@@ -251,7 +290,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
             </Button>
           )}
           {!generating && generatedFiles.length > 0 && (
-            <Button variant="outline" onClick={() => { setGeneratedFiles([]); setSelectedModes([]); setProgress(0); }}>
+            <Button variant="outline" onClick={() => { setGeneratedFiles([]); setSelectedModes([]); setColorModes(["color"]); setProgress(0); }}>
               Nouveau export
             </Button>
           )}

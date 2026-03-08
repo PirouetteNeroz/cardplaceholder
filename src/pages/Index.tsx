@@ -114,69 +114,84 @@ const Index = () => {
     setPdfStep("Initialisation...");
     try {
       const { jsPDF } = await import("jspdf");
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const cardsPerPage = 9;
+      const maxPagesPerPDF = 6;
+      const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF; // 54
+      const totalParts = Math.ceil(processedCards.length / maxCardsPerPDF);
 
-      setPdfStep("Page de couverture...");
-      setPdfProgress(5);
+      for (let part = 0; part < totalParts; part++) {
+        const startIdx = part * maxCardsPerPDF;
+        const endIdx = Math.min(startIdx + maxCardsPerPDF, processedCards.length);
+        const chunk = processedCards.slice(startIdx, endIdx);
 
-      doc.setFontSize(32);
-      doc.setFont("helvetica", "bold");
-      doc.text(setDetail.name, 105, 60, { align: "center" });
-      doc.setFontSize(18);
-      doc.setFont("helvetica", "normal");
-      doc.text("Collection Pokémon", 105, 75, { align: "center" });
-      doc.setFontSize(14);
-      doc.text(`Série: ${setDetail.serie.name}`, 30, 200);
-      doc.text(`Mode: ${MODES.find(m => m.value === mode)?.label}`, 30, 210);
-      doc.text(`Cartes: ${processedCards.length}`, 30, 220);
-      doc.text(`Langue: ${lang.toUpperCase()}`, 30, 230);
-      doc.addPage();
+        const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-      const cardW = 63, cardH = 88;
-      const marginX = (210 - cardW * 3) / 2;
-      let x = marginX, y = 20, count = 0;
-
-      for (let i = 0; i < processedCards.length; i++) {
-        const card = processedCards[i];
-        setPdfStep(`Carte ${i + 1} / ${processedCards.length}...`);
-        setPdfProgress(5 + ((i + 1) / processedCards.length) * 90);
-
-        let localId = card.localId
-          .replace("_reverse_pokeball", "")
-          .replace("_reverse_masterball", "")
-          .replace("_reverse", "");
-        const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${localId}/high.png`;
-
-        try {
-          const dataUrl = await loadCardWithOverlays(imgUrl, {
-            reverse: card.reverse,
-            reverseType: card.reverseType,
-            graded: card.graded,
-          });
-          if (dataUrl) {
-            doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
-          }
-        } catch {
-          // skip
+        if (part === 0) {
+          setPdfStep("Page de couverture...");
+          doc.setFontSize(32);
+          doc.setFont("helvetica", "bold");
+          doc.text(setDetail.name, 105, 60, { align: "center" });
+          doc.setFontSize(18);
+          doc.setFont("helvetica", "normal");
+          doc.text("Collection Pokémon", 105, 75, { align: "center" });
+          doc.setFontSize(14);
+          doc.text(`Série: ${setDetail.serie.name}`, 30, 200);
+          doc.text(`Mode: ${MODES.find(m => m.value === mode)?.label}`, 30, 210);
+          doc.text(`Cartes: ${processedCards.length}`, 30, 220);
+          doc.text(`Langue: ${lang.toUpperCase()}`, 30, 230);
+          if (totalParts > 1) doc.text(`Partie ${part + 1} / ${totalParts}`, 30, 240);
+          doc.addPage();
         }
 
-        x += cardW;
-        count++;
-        if (count % 3 === 0) {
-          x = marginX;
-          y += cardH;
-          if (count % 9 === 0 && count < processedCards.length) {
-            doc.addPage();
+        const cardW = 63, cardH = 88;
+        const marginX = (210 - cardW * 3) / 2;
+        let x = marginX, y = 20, count = 0;
+
+        for (let i = 0; i < chunk.length; i++) {
+          const card = chunk[i];
+          const globalIdx = startIdx + i;
+          setPdfStep(`Partie ${part + 1}/${totalParts} — Carte ${globalIdx + 1} / ${processedCards.length}...`);
+          setPdfProgress(5 + ((globalIdx + 1) / processedCards.length) * 90);
+
+          let localId = card.localId
+            .replace("_reverse_pokeball", "")
+            .replace("_reverse_masterball", "")
+            .replace("_reverse", "");
+          const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${localId}/high.png`;
+
+          try {
+            const dataUrl = await loadCardWithOverlays(imgUrl, {
+              reverse: card.reverse,
+              reverseType: card.reverseType,
+              graded: card.graded,
+            });
+            if (dataUrl) {
+              doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
+            }
+          } catch {
+            // skip
+          }
+
+          x += cardW;
+          count++;
+          if (count % 3 === 0) {
             x = marginX;
-            y = 20;
+            y += cardH;
+            if (count % 9 === 0 && count < chunk.length) {
+              doc.addPage();
+              x = marginX;
+              y = 20;
+            }
           }
         }
+
+        const suffix = totalParts > 1 ? `_part${part + 1}` : "";
+        doc.save(`${setDetail.name}_${mode}${suffix}.pdf`);
       }
 
       setPdfStep("Finalisation...");
       setPdfProgress(100);
-      doc.save(`${setDetail.name}_${mode}.pdf`);
-      toast.success("PDF téléchargé !");
+      toast.success(totalParts > 1 ? `${totalParts} PDFs téléchargés !` : "PDF téléchargé !");
     } catch (e) {
       toast.error("Erreur lors de la génération du PDF");
       console.error(e);

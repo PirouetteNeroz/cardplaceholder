@@ -72,6 +72,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   const [visualProgress, setVisualProgress] = useState(0);
   const [selectedVisualLangs, setSelectedVisualLangs] = useState<Lang[]>([lang]);
   const [visualPreview, setVisualPreview] = useState<string | null>(null);
+  const [customLogoUrl, setCustomLogoUrl] = useState("");
 
   // PNG page export state
   const [pngModes, setPngModes] = useState<ExportMode[]>([]);
@@ -211,7 +212,8 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
         lang,
         selectedVisualLangs.length > 0 ? selectedVisualLangs : [lang],
         (pct) => setVisualProgress(pct),
-        bgColor
+        bgColor,
+        customLogoUrl || undefined
       );
       const url = URL.createObjectURL(blob);
       setVisualPreview(url);
@@ -461,6 +463,20 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
                     {l.label}
                   </button>
                 ))}
+              </div>
+
+              {/* Custom logo URL */}
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  {setDetail?.logo ? "Logo détecté ✓ — URL personnalisée (optionnel) :" : "⚠️ Pas de logo trouvé — Ajouter une URL :"}
+                </p>
+                <Input
+                  type="url"
+                  placeholder="https://example.com/logo.png"
+                  value={customLogoUrl}
+                  onChange={(e) => setCustomLogoUrl(e.target.value)}
+                  className="h-8 text-xs"
+                />
               </div>
 
               {generatingVisual && (

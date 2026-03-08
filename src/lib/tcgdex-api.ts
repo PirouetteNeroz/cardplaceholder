@@ -114,6 +114,9 @@ export interface CardListItem {
   localId: string;
   name: string;
   image?: string;
+  setName?: string;
+  serieName?: string;
+  releaseDate?: string;
 }
 
 export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): Promise<CardListItem[]> {
@@ -122,8 +125,46 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
   const cards: CardListItem[] = await res.json();
   // Filter out Pokémon Pocket cards (series "tcgp")
   const filtered = cards.filter((c) => !c.id.startsWith("tcgp-"));
-  // Sort by ID to approximate creation/release order
-  filtered.sort((a, b) => a.id.localeCompare(b.id));
+
+  // Extract unique set IDs from card IDs (format: "setId-localId")
+  const setIds = [...new Set(filtered.map((c) => c.id.replace(/-[^-]+$/, "")))];
+
+  // Fetch set details for release dates and serie names
+  const setInfoMap: Record<string, { releaseDate: string; setName: string; serieName: string }> = {};
+  await Promise.all(
+    setIds.map(async (setId) => {
+      try {
+        const setDetail = await fetchSetDetail(lang, setId);
+        setInfoMap[setId] = {
+          releaseDate: (setDetail as any).releaseDate || "9999-12-31",
+          setName: setDetail.name,
+          serieName: setDetail.serie.name,
+        };
+      } catch {
+        setInfoMap[setId] = { releaseDate: "9999-12-31", setName: setId, serieName: "" };
+      }
+    })
+  );
+
+  // Enrich cards with set/serie info
+  for (const card of filtered) {
+    const setId = card.id.replace(/-[^-]+$/, "");
+    const info = setInfoMap[setId];
+    if (info) {
+      card.setName = info.setName;
+      card.serieName = info.serieName;
+      card.releaseDate = info.releaseDate;
+    }
+  }
+
+  // Sort by release date, then by localId within same set
+  filtered.sort((a, b) => {
+    const dateA = a.releaseDate || "9999-12-31";
+    const dateB = b.releaseDate || "9999-12-31";
+    if (dateA !== dateB) return dateA.localeCompare(dateB);
+    return a.id.localeCompare(b.id);
+  });
+
   return filtered;
 }
 

@@ -212,7 +212,8 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
         lang,
         selectedVisualLangs.length > 0 ? selectedVisualLangs : [lang],
         (pct) => setVisualProgress(pct),
-        bgColor
+        bgColor,
+        customLogoUrl || undefined
       );
       const url = URL.createObjectURL(blob);
       setVisualPreview(url);

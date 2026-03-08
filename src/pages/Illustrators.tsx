@@ -29,12 +29,6 @@ const Illustrators = () => {
   const [loading, setLoading] = useState(false);
   const [loadingCards, setLoadingCards] = useState(false);
 
-  // PDF state
-  const [pdfGenerating, setPdfGenerating] = useState(false);
-  const [pdfProgress, setPdfProgress] = useState(0);
-  const [pdfStep, setPdfStep] = useState("");
-  const [maxPagesPerPDF, setMaxPagesPerPDF] = useState(15);
-
   const handleLoad = useCallback(async () => {
     setLoading(true);
     setIllustrators([]);

@@ -1,12 +1,14 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { fetchIllustrators, fetchCardsByIllustrator, type Lang, type CardListItem } from "@/lib/tcgdex-api";
-import { Loader2, Paintbrush, Search, ArrowLeft } from "lucide-react";
+import { Loader2, Paintbrush, Search, ArrowLeft, Download } from "lucide-react";
 import { toast } from "sonner";
 import { NavLink } from "@/components/NavLink";
+import { PdfProgressDialog } from "@/components/PdfProgressDialog";
 
 const LANGS: { value: Lang; label: string }[] = [
   { value: "fr", label: "Français" },
@@ -27,6 +29,12 @@ const Illustrators = () => {
   const [cards, setCards] = useState<CardListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingCards, setLoadingCards] = useState(false);
+
+  // PDF state
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState(0);
+  const [pdfStep, setPdfStep] = useState("");
+  const [maxPagesPerPDF, setMaxPagesPerPDF] = useState(15);
 
   const handleLoad = useCallback(async () => {
     setLoading(true);
@@ -70,6 +78,98 @@ const Illustrators = () => {
     setLoadingCards(false);
   }, [lang]);
 
+  const handleExportPDF = useCallback(async () => {
+    if (!selectedIllustrator || cards.length === 0) {
+      toast.error("Veuillez d'abord sélectionner un illustrateur");
+      return;
+    }
+    setPdfGenerating(true);
+    setPdfProgress(0);
+    setPdfStep("Initialisation...");
+    try {
+      const { jsPDF } = await import("jspdf");
+      const cardsPerPage = 9;
+      const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF;
+      const totalParts = Math.ceil(cards.length / maxCardsPerPDF);
+
+      for (let part = 0; part < totalParts; part++) {
+        const startIdx = part * maxCardsPerPDF;
+        const endIdx = Math.min(startIdx + maxCardsPerPDF, cards.length);
+        const chunk = cards.slice(startIdx, endIdx);
+
+        const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+        // Cover page
+        if (part === 0) {
+          setPdfStep("Page de couverture...");
+          doc.setFontSize(32);
+          doc.setFont("helvetica", "bold");
+          doc.text(selectedIllustrator, 105, 60, { align: "center" });
+          doc.setFontSize(18);
+          doc.setFont("helvetica", "normal");
+          doc.text("Illustrateur Pokémon TCG", 105, 75, { align: "center" });
+          doc.setFontSize(14);
+          doc.text(`Cartes: ${cards.length}`, 30, 200);
+          doc.text(`Langue: ${lang.toUpperCase()}`, 30, 210);
+          if (totalParts > 1) doc.text(`Partie ${part + 1} / ${totalParts}`, 30, 220);
+          doc.addPage();
+        }
+
+        const cardW = 63, cardH = 88;
+        const marginX = (210 - cardW * 3) / 2;
+        let x = marginX, y = 20, count = 0;
+
+        for (let i = 0; i < chunk.length; i++) {
+          const card = chunk[i];
+          const globalIdx = startIdx + i;
+          setPdfStep(`Partie ${part + 1}/${totalParts} — Carte ${globalIdx + 1} / ${cards.length}...`);
+          setPdfProgress(5 + ((globalIdx + 1) / cards.length) * 90);
+
+          if (card.image) {
+            const imgUrl = `${card.image}/high.png`;
+            try {
+              const resp = await fetch(imgUrl, { mode: "cors" });
+              const blob = await resp.blob();
+              const img = await createImageBitmap(blob);
+              const canvas = document.createElement("canvas");
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext("2d")!;
+              ctx.drawImage(img, 0, 0);
+              const dataUrl = canvas.toDataURL("image/png");
+              doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
+            } catch {
+              // skip
+            }
+          }
+
+          x += cardW;
+          count++;
+          if (count % 3 === 0) {
+            x = marginX;
+            y += cardH;
+            if (count % 9 === 0 && count < chunk.length) {
+              doc.addPage();
+              x = marginX;
+              y = 20;
+            }
+          }
+        }
+
+        const suffix = totalParts > 1 ? `_part${part + 1}` : "";
+        doc.save(`${selectedIllustrator}${suffix}.pdf`);
+      }
+
+      setPdfStep("Finalisation...");
+      setPdfProgress(100);
+      toast.success(totalParts > 1 ? `${totalParts} PDFs téléchargés !` : "PDF téléchargé !");
+    } catch (e) {
+      toast.error("Erreur lors de la génération du PDF");
+      console.error(e);
+    }
+    setTimeout(() => setPdfGenerating(false), 800);
+  }, [selectedIllustrator, cards, lang, maxPagesPerPDF]);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-10">
@@ -95,6 +195,22 @@ const Illustrators = () => {
             <Button onClick={handleLoad} disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Charger les illustrateurs
+            </Button>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="maxPagesIllustrator" className="text-xs text-muted-foreground whitespace-nowrap">Pages max/PDF</Label>
+              <Input
+                id="maxPagesIllustrator"
+                type="number"
+                min={1}
+                max={50}
+                value={maxPagesPerPDF}
+                onChange={(e) => setMaxPagesPerPDF(Math.max(1, parseInt(e.target.value) || 6))}
+                className="w-[70px] h-9"
+              />
+            </div>
+            <Button variant="outline" onClick={handleExportPDF} disabled={cards.length === 0}>
+              <Download className="mr-2 h-4 w-4" />
+              PDF
             </Button>
           </div>
         </div>
@@ -195,6 +311,12 @@ const Illustrators = () => {
           </div>
         )}
       </div>
+
+      <PdfProgressDialog
+        open={pdfGenerating}
+        progress={pdfProgress}
+        currentStep={pdfStep}
+      />
     </div>
   );
 };

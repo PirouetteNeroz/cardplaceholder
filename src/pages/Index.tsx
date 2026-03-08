@@ -321,6 +321,12 @@ const Index = () => {
           </div>
         )}
       </div>
+
+      <PdfProgressDialog
+        open={pdfGenerating}
+        progress={pdfProgress}
+        currentStep={pdfStep}
+      />
     </div>
   );
 };

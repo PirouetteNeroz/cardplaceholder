@@ -52,16 +52,21 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   };
 
   const handleGenerate = async () => {
-    if (!setDetail || selectedModes.length === 0) return;
+    if (!setDetail || selectedModes.length === 0 || colorModes.length === 0) return;
     setGenerating(true);
     setGeneratedFiles([]);
     const files: GeneratedFile[] = [];
+    const totalJobs = selectedModes.length * colorModes.length;
+    let jobIndex = 0;
 
-    for (let i = 0; i < selectedModes.length; i++) {
-      const mode = selectedModes[i];
-      setCurrentFileIndex(i + 1);
-      setCurrentStep(`Traitement des cartes (${MODES.find(m => m.value === mode)?.label})...`);
-      setProgress(0);
+    for (const mode of selectedModes) {
+      for (const colorMode of colorModes) {
+        jobIndex++;
+        const isGrayscale = colorMode === "grayscale";
+        const colorLabel = isGrayscale ? "N&B" : "Couleur";
+        setCurrentFileIndex(jobIndex);
+        setCurrentStep(`Traitement (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
+        setProgress(0);
 
       try {
         const cards = await processCards(lang, setDetail, mode, (pct) => {

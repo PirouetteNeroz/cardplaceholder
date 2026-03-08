@@ -68,7 +68,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
           // Cover page
           doc.setFontSize(32);
           doc.setFont("helvetica", "bold");
-          doc.text(illustratorName, 105, 60, { align: "center" });
+          doc.text(entityName, 105, 60, { align: "center" });
           doc.setFontSize(18);
           doc.setFont("helvetica", "normal");
           doc.text("Illustrateur Pokémon TCG", 105, 75, { align: "center" });

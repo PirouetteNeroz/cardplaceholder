@@ -305,7 +305,7 @@ const Illustrators = () => {
                         />
                       )}
                       <p className="text-xs font-semibold mt-2 truncate text-card-foreground">{card.name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{card.localId}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{card.serieName} #{card.localId}</p>
                     </div>
                   ))}
                 </div>

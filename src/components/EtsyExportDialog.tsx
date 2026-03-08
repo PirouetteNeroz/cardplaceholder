@@ -63,7 +63,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   const [currentStep, setCurrentStep] = useState("");
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
-  const [bgColor, setBgColor] = useState("#2d1b69");
+  const [bgColor, setBgColor] = useState("#e91e8c");
 
   // Visual generator state
   const [generatingVisual, setGeneratingVisual] = useState(false);

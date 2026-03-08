@@ -1,14 +1,13 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { fetchIllustrators, fetchCardsByIllustrator, type Lang, type CardListItem } from "@/lib/tcgdex-api";
-import { Loader2, Paintbrush, Search, ArrowLeft, Download } from "lucide-react";
+import { Loader2, Paintbrush, Search, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { NavLink } from "@/components/NavLink";
-import { PdfProgressDialog } from "@/components/PdfProgressDialog";
+import { IllustratorEtsyDialog } from "@/components/IllustratorEtsyDialog";
 
 const LANGS: { value: Lang; label: string }[] = [
   { value: "fr", label: "Français" },

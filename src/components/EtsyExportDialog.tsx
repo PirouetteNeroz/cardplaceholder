@@ -436,6 +436,28 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
                   </div>
                 </div>
               </div>
+
+              {/* PDF Languages selector */}
+              <div className="border-t pt-3 mt-3">
+                <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                  🌍 Langues des PDFs :
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {AVAILABLE_LANGS.map((l) => (
+                    <button
+                      key={l.value}
+                      onClick={() => togglePdfLang(l.value)}
+                      className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                        selectedPdfLangs.includes(l.value)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-foreground border-border hover:bg-muted"
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -119,7 +119,6 @@ const Index = () => {
       const { jsPDF } = await import("jspdf");
       const cardsPerPage = 9;
       const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF;
-      const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF; // 54
       const totalParts = Math.ceil(processedCards.length / maxCardsPerPDF);
 
       for (let part = 0; part < totalParts; part++) {

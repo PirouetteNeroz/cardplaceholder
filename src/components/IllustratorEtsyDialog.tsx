@@ -225,11 +225,10 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
               }
             }
 
-            const langSuffix = selectedPdfLangs.length > 1 ? `_${pdfLang}` : "";
             const colorSuffix = isGrayscale ? "_nb" : "";
             const partSuffix = totalParts > 1 ? `_part${part + 1}` : "";
             files.push({
-              name: `${entityName}${langSuffix}${colorSuffix}${partSuffix}.pdf`,
+              name: `${pdfLang.toUpperCase()}_${entityName}${colorSuffix}${partSuffix}.pdf`,
               blob: doc.output("blob"),
             });
           }

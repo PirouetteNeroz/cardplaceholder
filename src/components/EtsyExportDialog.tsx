@@ -175,10 +175,10 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
               (pct) => setPngProgress(((jobDone + pct / 100) / totalJobs) * 100)
             );
             if (blob) {
-              const langSuffix = pngLangs.length > 1 ? `_${pngLang}` : "";
               const colorSuffix = isGray ? "_nb" : "";
+              const modeLabel = mode === "complete" ? "complete-set" : mode === "master" ? "master-set" : mode === "graded" ? "graded-set" : "special-set";
               pngFiles.push({
-                name: `${langSet.name}${langSuffix}_${mode}${colorSuffix}_page${pageIdx + 1}.png`,
+                name: `${pngLang.toUpperCase()}_${langSet.name}_${modeLabel}${colorSuffix}_page${pageIdx + 1}.png`,
                 mode,
                 blob,
                 type: "image",
@@ -218,7 +218,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${setDetail.name}_etsy_visual.png`;
+      a.download = `${lang.toUpperCase()}_${setDetail.name}_etsy_visual.png`;
       a.click();
 
       toast.success("Visuel Etsy généré !");
@@ -341,13 +341,13 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
               setProgress(30 + globalProgress * 70);
             }
 
-            const langSuffix = selectedPdfLangs.length > 1 ? `_${pdfLang}` : "";
             const colorSuffix = isGrayscale ? "_nb" : "";
             const suffix = totalParts > 1 ? `_part${part + 1}` : "";
             const pdfBlob = doc.output("blob");
+            const modeLabel = mode === "complete" ? "complete-set" : mode === "master" ? "master-set" : mode === "graded" ? "graded-set" : "special-set";
             
             files.push({
-              name: `${langSetDetail.name}${langSuffix}_${mode}${colorSuffix}${suffix}.pdf`,
+              name: `${pdfLang.toUpperCase()}_${langSetDetail.name}_${modeLabel}${colorSuffix}${suffix}.pdf`,
               mode,
               blob: pdfBlob,
               type: "pdf",

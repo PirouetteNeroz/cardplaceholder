@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ShoppingBag, Download, Loader2, CheckCircle2, Palette, Image as ImageIcon, Archive, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { ShoppingBag, Download, Loader2, CheckCircle2, Palette, Image as ImageIcon, Archive, ChevronLeft, ChevronRight, Eye, FileImage } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { ExportMode, SetDetail, Lang } from "@/lib/tcgdex-api";
 import { processCards, fetchSetDetail } from "@/lib/tcgdex-api";
 import { toast } from "sonner";
 import { loadCardWithOverlays } from "@/lib/pdf-utils";
 import { generateEtsyVisual } from "@/lib/etsy-visual-generator";
+import { renderPageAsPng, getTotalPages } from "@/lib/page-png-generator";
 
 const MODES: { value: ExportMode; label: string; description: string }[] = [
   { value: "complete", label: "Complete Set", description: "Toutes les cartes du set" },
@@ -72,6 +73,15 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   const [selectedVisualLangs, setSelectedVisualLangs] = useState<Lang[]>([lang]);
   const [visualPreview, setVisualPreview] = useState<string | null>(null);
 
+  // PNG page export state
+  const [pngModes, setPngModes] = useState<ExportMode[]>([]);
+  const [pngLangs, setPngLangs] = useState<Lang[]>([lang]);
+  const [pngColorModes, setPngColorModes] = useState<("color" | "grayscale")[]>(["color"]);
+  const [pngPage, setPngPage] = useState(1);
+  const [generatingPng, setGeneratingPng] = useState(false);
+  const [pngProgress, setPngProgress] = useState(0);
+  const [pngStep, setPngStep] = useState("");
+
   // Preview state
   const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null);
   const [previewPage, setPreviewPage] = useState(0);
@@ -98,6 +108,97 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
     setSelectedVisualLangs((prev) =>
       prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]
     );
+  };
+
+  const togglePngMode = (mode: ExportMode) => {
+    setPngModes((prev) =>
+      prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode]
+    );
+  };
+
+  const togglePngLang = (l: Lang) => {
+    setPngLangs((prev) =>
+      prev.includes(l) ? (prev.length > 1 ? prev.filter((x) => x !== l) : prev) : [...prev, l]
+    );
+  };
+
+  const togglePngColorMode = (cm: "color" | "grayscale") => {
+    setPngColorModes((prev) =>
+      prev.includes(cm) ? prev.filter((c) => c !== cm) : [...prev, cm]
+    );
+  };
+
+  const handleGeneratePng = async () => {
+    if (!setDetail || pngModes.length === 0 || pngLangs.length === 0 || pngColorModes.length === 0) return;
+    setGeneratingPng(true);
+    setPngProgress(0);
+    const pngFiles: GeneratedFile[] = [];
+    const totalJobs = pngModes.length * pngLangs.length * pngColorModes.length;
+    let jobDone = 0;
+
+    for (const pngLang of pngLangs) {
+      let langSet: SetDetail;
+      try {
+        langSet = await fetchSetDetail(pngLang, setDetail.id);
+      } catch {
+        toast.error(`Impossible de charger le set en ${pngLang.toUpperCase()}`);
+        continue;
+      }
+
+      for (const mode of pngModes) {
+        const modeLabel = MODES.find((m) => m.value === mode)?.label || mode;
+        setPngStep(`${pngLang.toUpperCase()} — ${modeLabel} — Traitement cartes...`);
+
+        let cards;
+        try {
+          cards = await processCards(pngLang, langSet, mode);
+        } catch {
+          toast.error(`Erreur traitement ${modeLabel}`);
+          continue;
+        }
+
+        const totalPages = getTotalPages(cards.length);
+        const pageIdx = Math.min(pngPage - 1, totalPages - 1);
+
+        for (const cm of pngColorModes) {
+          const isGray = cm === "grayscale";
+          const colorLabel = isGray ? "N&B" : "Couleur";
+          setPngStep(`${pngLang.toUpperCase()} — ${modeLabel} — ${colorLabel} — Page ${pageIdx + 1}...`);
+
+          try {
+            const blob = await renderPageAsPng(
+              cards,
+              pageIdx,
+              pngLang,
+              langSet,
+              { grayscale: isGray },
+              (pct) => setPngProgress(((jobDone + pct / 100) / totalJobs) * 100)
+            );
+            if (blob) {
+              const langSuffix = pngLangs.length > 1 ? `_${pngLang}` : "";
+              const colorSuffix = isGray ? "_nb" : "";
+              pngFiles.push({
+                name: `${langSet.name}${langSuffix}_${mode}${colorSuffix}_page${pageIdx + 1}.png`,
+                mode,
+                blob,
+                type: "image",
+              });
+            }
+          } catch (e) {
+            console.error(e);
+          }
+          jobDone++;
+          setPngProgress((jobDone / totalJobs) * 100);
+        }
+      }
+    }
+
+    if (pngFiles.length > 0) {
+      setGeneratedFiles((prev) => [...prev, ...pngFiles]);
+      toast.success(`${pngFiles.length} PNG(s) générés !`);
+    }
+    setGeneratingPng(false);
+    setPngStep("");
   };
 
   const handleGenerateVisual = async () => {
@@ -296,7 +397,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!generating && !generatingVisual) setOpen(v); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!generating && !generatingVisual && !generatingPng) setOpen(v); }}>
       <DialogTrigger asChild>
         <Button variant="outline" disabled={disabled}>
           <ShoppingBag className="mr-2 h-4 w-4" />
@@ -387,6 +488,116 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
                   <ImageIcon className="mr-2 h-4 w-4" />
                 )}
                 Générer le visuel Etsy
+              </Button>
+            </div>
+
+            {/* === PNG Page Export Section === */}
+            <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <FileImage className="h-4 w-4 text-primary" />
+                Export PNG d'une page
+              </h3>
+
+              {/* Mode selection */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Modes :</p>
+                <div className="flex flex-wrap gap-2">
+                  {MODES.map((m) => (
+                    <button
+                      key={m.value}
+                      onClick={() => togglePngMode(m.value)}
+                      className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                        pngModes.includes(m.value)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-foreground border-border hover:bg-muted"
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Language selection */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">🌍 Langues :</p>
+                <div className="flex flex-wrap gap-2">
+                  {AVAILABLE_LANGS.map((l) => (
+                    <button
+                      key={l.value}
+                      onClick={() => togglePngLang(l.value)}
+                      className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                        pngLangs.includes(l.value)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-foreground border-border hover:bg-muted"
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Color mode */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Palette className="h-3 w-3" /> Couleur :
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => togglePngColorMode("color")}
+                    className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                      pngColorModes.includes("color")
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    Couleur
+                  </button>
+                  <button
+                    onClick={() => togglePngColorMode("grayscale")}
+                    className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                      pngColorModes.includes("grayscale")
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    N&B
+                  </button>
+                </div>
+              </div>
+
+              {/* Page number */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Numéro de page :</p>
+                <Input
+                  type="number"
+                  min={1}
+                  value={pngPage}
+                  onChange={(e) => setPngPage(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-24 h-8 text-sm"
+                />
+              </div>
+
+              {generatingPng && (
+                <div className="space-y-2">
+                  <Progress value={pngProgress} className="h-2" />
+                  <p className="text-xs text-muted-foreground text-center">{pngStep}</p>
+                </div>
+              )}
+
+              <Button
+                size="sm"
+                onClick={handleGeneratePng}
+                disabled={generatingPng || pngModes.length === 0 || pngLangs.length === 0 || pngColorModes.length === 0}
+                className="w-full"
+              >
+                {generatingPng ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <FileImage className="mr-2 h-4 w-4" />
+                )}
+                Générer PNG page {pngPage}
               </Button>
             </div>
 

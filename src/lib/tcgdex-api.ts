@@ -123,8 +123,8 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
   const res = await fetch(`${BASE_URL}/${lang}/cards?illustrator=${encodeURIComponent(illustrator)}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const cards: CardListItem[] = await res.json();
-  // Filter out Pokémon Pocket cards (series "tcgp")
-  const filtered = cards.filter((c) => !c.id.startsWith("tcgp-"));
+  // Filter out Pokémon Pocket and "Jeu de Cartes à Collectionner" cards
+  const filtered = cards.filter((c) => !c.id.startsWith("tcgp-") && !c.id.startsWith("jcc-"));
 
   // Extract unique set IDs from card IDs (format: "setId-localId")
   const setIds = [...new Set(filtered.map((c) => c.id.replace(/-[^-]+$/, "")))];

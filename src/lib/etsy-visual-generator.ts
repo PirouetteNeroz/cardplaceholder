@@ -55,7 +55,7 @@ export function hexToGradient(hex: string): { start: string; mid: string; end: s
   const toHex = (r2: number, g2: number, b2: number) =>
     `#${r2.toString(16).padStart(2, "0")}${g2.toString(16).padStart(2, "0")}${b2.toString(16).padStart(2, "0")}`;
   return {
-    start: toHex(darken(r, 0.5), darken(g, 0.5), darken(b, 0.5)),
+    start: toHex(darken(r, 0.3), darken(g, 0.3), darken(b, 0.3)),
     mid: hex,
     end: toHex(darken(r, 0.5), darken(g, 0.5), darken(b, 0.5)),
   };
@@ -73,7 +73,6 @@ async function generatePagePreview(
   page.height = pageH;
   const pctx = page.getContext("2d")!;
 
-  // White page background
   pctx.fillStyle = "#ffffff";
   pctx.fillRect(0, 0, pageW, pageH);
 
@@ -103,7 +102,6 @@ async function generatePagePreview(
     }
   }
 
-  // Grayscale filter
   if (grayscale && drawn > 0) {
     const imageData = pctx.getImageData(0, 0, pageW, pageH);
     const data = imageData.data;
@@ -131,10 +129,10 @@ function drawPageOnCanvas(
   ctx.rotate((rotation * Math.PI) / 180);
 
   // Shadow
-  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-  ctx.shadowBlur = 20;
-  ctx.shadowOffsetX = 5;
-  ctx.shadowOffsetY = 5;
+  ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+  ctx.shadowBlur = 25;
+  ctx.shadowOffsetX = 4;
+  ctx.shadowOffsetY = 6;
 
   // Page background
   ctx.fillStyle = "#fff";
@@ -144,9 +142,9 @@ function drawPageOnCanvas(
   // Draw page content
   ctx.drawImage(page, -w / 2, -h / 2, w, h);
 
-  // Subtle border
-  ctx.strokeStyle = "rgba(0,0,0,0.15)";
-  ctx.lineWidth = 1;
+  // Border
+  ctx.strokeStyle = "rgba(0,0,0,0.12)";
+  ctx.lineWidth = 1.5;
   ctx.strokeRect(-w / 2, -h / 2, w, h);
 
   ctx.restore();
@@ -164,20 +162,25 @@ function drawBadge(
   ctx.translate(x, y);
   ctx.rotate((rotation * Math.PI) / 180);
 
-  ctx.font = "bold 22px Arial, sans-serif";
+  ctx.font = "bold 20px Arial, sans-serif";
   const textW = ctx.measureText(text).width;
-  const bw = textW + 36;
-  const bh = 38;
+  const bw = textW + 30;
+  const bh = 34;
 
-  // Shadow
-  ctx.shadowColor = "rgba(0,0,0,0.3)";
-  ctx.shadowBlur = 8;
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = 10;
   ctx.shadowOffsetY = 3;
 
-  roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 8);
+  roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 17);
   ctx.fillStyle = color;
   ctx.fill();
   ctx.shadowColor = "transparent";
+
+  // White border for contrast
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 17);
+  ctx.stroke();
 
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
@@ -201,14 +204,35 @@ export async function generateEtsyVisual(
 
   onProgress?.(2);
 
-  // === Solid background ===
-  ctx.fillStyle = bgColor || "#e91e8c";
+  // === Background gradient ===
+  const baseColor = bgColor || "#e91e8c";
+  const grad = hexToGradient(baseColor);
+  const bgGrad = ctx.createRadialGradient(SIZE / 2, SIZE / 2, 100, SIZE / 2, SIZE / 2, SIZE * 0.75);
+  bgGrad.addColorStop(0, grad.mid);
+  bgGrad.addColorStop(1, grad.start);
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, SIZE, SIZE);
+
+  // Subtle pattern overlay
+  ctx.save();
+  ctx.globalAlpha = 0.06;
+  for (let i = 0; i < SIZE; i += 40) {
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, SIZE);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(SIZE, i);
+    ctx.stroke();
+  }
+  ctx.restore();
 
   onProgress?.(5);
 
-  // === Load card images for page previews ===
-  // We need ~27 cards (3 pages x 9 cards) for the collage
+  // === Load card images ===
   const sampleCards = setDetail.cards.slice(0, 27);
   const cardDataUrls: (string | null)[] = [];
 
@@ -229,56 +253,52 @@ export async function generateEtsyVisual(
 
   onProgress?.(45);
 
-  // === Generate page previews for each mode ===
-  const pageW = 280;
-  const pageH = 396;
+  // === Generate page previews ===
+  const pageW = 240;
+  const pageH = 340;
 
-  // Complete Set page (cards 0-8)
   const completePage = await generatePagePreview(cardDataUrls.slice(0, 9));
-  // Master Set page (cards 9-17)  
   const masterPage = await generatePagePreview(
     cardDataUrls.slice(9, 18).length >= 9 ? cardDataUrls.slice(9, 18) : cardDataUrls.slice(0, 9)
   );
-  // Graded Set page (cards 18-26)
   const gradedPage = await generatePagePreview(
     cardDataUrls.slice(18, 27).length >= 9 ? cardDataUrls.slice(18, 27) : cardDataUrls.slice(0, 9)
   );
-  // Grayscale page
   const grayscalePage = await generatePagePreview(cardDataUrls.slice(0, 9), true);
 
   onProgress?.(55);
 
-  // === Draw pages in collage layout - heavily overlapping like reference ===
-  
-  // Layer 1 (bottom): Graded pages in bottom-left corner, stacked
-  drawPageOnCanvas(ctx, gradedPage, -60, 580, pageW * 0.95, pageH * 0.95, -12);
-  drawPageOnCanvas(ctx, gradedPage, 40, 520, pageW * 0.95, pageH * 0.95, -6);
-  drawPageOnCanvas(ctx, gradedPage, 140, 480, pageW * 0.9, pageH * 0.9, 2);
+  // === Fan layout: 4 pages spread from bottom center like a hand of cards ===
+  const fanCenterX = SIZE / 2;
+  const fanCenterY = SIZE + 180; // pivot below canvas
+  const fanRadius = 620;
+  const angles = [-22, -8, 8, 22]; // spread angles
+  const pages = [gradedPage, completePage, masterPage, grayscalePage];
+  const pageLabels = ["Graded Set", "Complete Set", "Master Set", "Grayscale"];
+  const badgeColors = ["#ef4444", "#22c55e", "#3b82f6", "#6b7280"];
 
-  // Layer 2: Complete Set - center-left, overlapping with graded
-  drawPageOnCanvas(ctx, completePage, 60, 180, pageW, pageH, -5);
-  
-  // Layer 3: Master Set - center, overlapping complete set
-  drawPageOnCanvas(ctx, masterPage, 280, 100, pageW, pageH, 3);
-  
-  // Layer 4: Grayscale - top right corner, overlapping others
-  drawPageOnCanvas(ctx, grayscalePage, 620, -50, pageW * 0.9, pageH * 0.9, 8);
-  
-  // Extra overlapping pages on right side for density
-  drawPageOnCanvas(ctx, completePage, 550, 350, pageW * 0.85, pageH * 0.85, 12);
-  drawPageOnCanvas(ctx, masterPage, 680, 500, pageW * 0.8, pageH * 0.8, -5);
+  for (let i = 0; i < pages.length; i++) {
+    const angle = angles[i];
+    const rad = (angle * Math.PI) / 180;
+    const px = fanCenterX + Math.sin(rad) * fanRadius - pageW / 2;
+    const py = fanCenterY - Math.cos(rad) * fanRadius - pageH / 2;
+    drawPageOnCanvas(ctx, pages[i], px, py, pageW, pageH, angle);
+  }
 
   onProgress?.(65);
 
-  // === Draw mode badges near their pages ===
-  drawBadge(ctx, "Graded Set", 80, 550, "#ef4444", -8);
-  drawBadge(ctx, "Complete Set", 180, 250, "#22c55e", -5);
-  drawBadge(ctx, "Master Set", 420, 170, "#3b82f6", 5);
-  drawBadge(ctx, "Grayscale", 760, 40, "#6b7280", 8);
+  // === Badges along the bottom of each page ===
+  for (let i = 0; i < pages.length; i++) {
+    const angle = angles[i];
+    const rad = (angle * Math.PI) / 180;
+    const bx = fanCenterX + Math.sin(rad) * (fanRadius - pageH / 2 + 30);
+    const by = fanCenterY - Math.cos(rad) * (fanRadius - pageH / 2 + 30);
+    drawBadge(ctx, pageLabels[i], bx, by, badgeColors[i], angle * 0.5);
+  }
 
   onProgress?.(70);
 
-  // === Set logo (large, centered) ===
+  // === Set logo (centered, upper area) ===
   let logoImg: HTMLImageElement | null = null;
   if (setDetail.logo) {
     try {
@@ -288,9 +308,10 @@ export async function generateEtsyVisual(
     }
   }
 
+  const logoAreaY = 100;
   if (logoImg) {
-    const maxLogoW = 450;
-    const maxLogoH = 250;
+    const maxLogoW = 500;
+    const maxLogoH = 180;
     const logoAspect = logoImg.width / logoImg.height;
     let logoW = maxLogoW;
     let logoH = logoW / logoAspect;
@@ -299,58 +320,68 @@ export async function generateEtsyVisual(
       logoW = logoH * logoAspect;
     }
 
-    const logoX = SIZE / 2 - logoW / 2 + 40;
-    const logoY = SIZE / 2 - logoH / 2 + 30;
+    const logoX = SIZE / 2 - logoW / 2;
+    const logoY = logoAreaY;
 
-    // White glow/shadow behind logo for readability
+    // Glow behind logo
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-    ctx.shadowBlur = 30;
+    ctx.shadowBlur = 35;
     ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
     ctx.restore();
-
-    // Crisp logo on top
     ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
   } else {
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
-    ctx.shadowBlur = 15;
+    ctx.shadowBlur = 20;
     ctx.shadowOffsetY = 4;
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 64px Arial, sans-serif";
+    ctx.font = "bold 60px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(setDetail.name, SIZE / 2, SIZE / 2);
+    ctx.fillText(setDetail.name, SIZE / 2, logoAreaY + 80);
     ctx.restore();
   }
 
   onProgress?.(80);
 
-  // === "Download, Print, Cut" top left ===
+  // === "Download · Print · Cut" header ===
   ctx.save();
   ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-  ctx.shadowBlur = 6;
+  ctx.shadowBlur = 8;
   ctx.shadowOffsetY = 2;
-  ctx.fillStyle = "#000";
-  ctx.font = "bold 36px Arial, sans-serif";
-  ctx.textAlign = "left";
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 32px Arial, sans-serif";
+  ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillText("Download, Print, Cut", 25, 20);
+  ctx.fillText("Download  ·  Print  ·  Cut", SIZE / 2, 30);
   ctx.restore();
 
-  // === Language flags (top left, below text) ===
-  const flagSize = 40;
-  const flagGap = 8;
-  let flagX = 30;
-  const flagY = 70;
+  // === Language flags (horizontal row below logo) ===
+  const flagSize = 44;
+  const flagGap = 12;
+  const totalFlagW = langs.length * flagSize + (langs.length - 1) * flagGap;
+  let flagX = SIZE / 2 - totalFlagW / 2;
+  const flagY = logoImg ? logoAreaY + 200 : logoAreaY + 160;
 
   for (const l of langs) {
     try {
       const flagImg = await loadImage(FLAG_URLS[l]);
       ctx.save();
       ctx.shadowColor = "rgba(0,0,0,0.3)";
-      ctx.shadowBlur = 4;
-      ctx.drawImage(flagImg, flagX, flagY, flagSize, flagSize * 0.67);
+      ctx.shadowBlur = 6;
+      // Draw flag with rounded corners
+      const fh = flagSize * 0.67;
+      roundRect(ctx, flagX, flagY, flagSize, fh, 4);
+      ctx.clip();
+      ctx.drawImage(flagImg, flagX, flagY, flagSize, fh);
+      ctx.restore();
+      // Border
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 1.5;
+      roundRect(ctx, flagX, flagY, flagSize, fh, 4);
+      ctx.stroke();
       ctx.restore();
     } catch {
       // skip
@@ -360,21 +391,25 @@ export async function generateEtsyVisual(
 
   onProgress?.(88);
 
-  // === "✨ Download ✨" bottom center ===
+  // === Bottom CTA ===
   ctx.save();
+  // Semi-transparent dark bar
+  const barH = 60;
+  const barY = SIZE - barH;
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.fillRect(0, barY, SIZE, barH);
+  
   ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-  ctx.shadowBlur = 10;
-  ctx.shadowOffsetY = 3;
-  ctx.fillStyle = "#000";
-  ctx.font = "bold 52px Arial, sans-serif";
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 30px Arial, sans-serif";
   ctx.textAlign = "center";
-  ctx.textBaseline = "bottom";
-  ctx.fillText("✨ Download ✨", SIZE / 2, SIZE - 30);
+  ctx.textBaseline = "middle";
+  ctx.fillText("✨  Instant Digital Download  ✨", SIZE / 2, barY + barH / 2);
   ctx.restore();
 
   onProgress?.(95);
 
-  // === Export as blob ===
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) {

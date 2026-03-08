@@ -117,29 +117,29 @@ async function loadModeCards(
 async function generatePagePreview(
   cardImages: (string | null)[]
 ): Promise<HTMLCanvasElement> {
-  const pageW = 420;
-  const pageH = 594;
+  const cols = 3;
+  const rows = 3;
+  const cardW = 140;
+  const cardH = 196;
+  const gap = 4;
+  const pageW = cols * cardW + (cols - 1) * gap;
+  const pageH = rows * cardH + (rows - 1) * gap;
   const page = document.createElement("canvas");
   page.width = pageW;
   page.height = pageH;
   const pctx = page.getContext("2d")!;
 
-  pctx.fillStyle = "#ffffff";
-  pctx.fillRect(0, 0, pageW, pageH);
+  // Transparent background (no white)
+  pctx.clearRect(0, 0, pageW, pageH);
 
-  const cardW = 126;
-  const cardH = 176;
-  const marginX = (pageW - cardW * 3) / 2;
-  const marginY = 15;
-
-  for (let row = 0; row < 3; row++) {
-    for (let col = 0; col < 3; col++) {
-      const idx = row * 3 + col;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const idx = row * cols + col;
       if (idx >= cardImages.length) break;
       const dataUrl = cardImages[idx];
       if (!dataUrl) continue;
-      const x = marginX + col * cardW;
-      const y = marginY + row * cardH;
+      const x = col * (cardW + gap);
+      const y = row * (cardH + gap);
       try {
         const img = await loadImage(dataUrl);
         pctx.drawImage(img, x, y, cardW, cardH);

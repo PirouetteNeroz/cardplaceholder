@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ShoppingBag, Download, Loader2, CheckCircle2, Palette } from "lucide-react";
+import { ShoppingBag, Download, Loader2, CheckCircle2, Palette, Archive, Image } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { Lang, CardListItem } from "@/lib/tcgdex-api";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
   const [currentStep, setCurrentStep] = useState("");
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
   const [maxPagesPerPDF, setMaxPagesPerPDF] = useState(15);
+  const [includePromoVisual, setIncludePromoVisual] = useState(true);
 
   const toggleColorMode = (cm: "color" | "grayscale") => {
     setColorModes((prev) =>
@@ -42,15 +43,38 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
     setGenerating(true);
     setGeneratedFiles([]);
     const files: GeneratedFile[] = [];
-    const totalJobs = colorModes.length;
+    const totalJobs = colorModes.length + (includePromoVisual ? 1 : 0);
     let jobIndex = 0;
+
+    // Generate promo visual first
+    if (includePromoVisual) {
+      jobIndex++;
+      setCurrentStep("Génération du visuel promo...");
+      setProgress((jobIndex / totalJobs) * 10);
+      try {
+        const { generateIllustratorPromoVisual } = await import("@/lib/illustrator-promo-generator");
+        const promoBlob = await generateIllustratorPromoVisual(
+          entityName,
+          entityLabel,
+          cards,
+          lang,
+          (pct) => setProgress((jobIndex - 1) / totalJobs * 100 + pct / totalJobs)
+        );
+        files.push({
+          name: `${entityName}_promo.png`,
+          blob: promoBlob,
+        });
+      } catch (e) {
+        console.error(e);
+        toast.error("Erreur lors de la génération du visuel promo");
+      }
+    }
 
     for (const colorMode of colorModes) {
       jobIndex++;
       const isGrayscale = colorMode === "grayscale";
       const colorLabel = isGrayscale ? "N&B" : "Couleur";
       setCurrentStep(`Génération PDF (${colorLabel})...`);
-      setProgress(0);
 
       try {
         const { jsPDF } = await import("jspdf");
@@ -202,7 +226,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
     setGenerating(false);
     setProgress(100);
     setCurrentStep("Terminé !");
-    toast.success(`${files.length} fichier(s) PDF générés !`);
+    toast.success(`${files.length} fichier(s) générés !`);
   };
 
   const handleDownload = (file: GeneratedFile) => {
@@ -214,8 +238,28 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
     URL.revokeObjectURL(url);
   };
 
-  const handleDownloadAll = () => {
-    generatedFiles.forEach((file) => handleDownload(file));
+  const handleDownloadZip = async () => {
+    setCurrentStep("Création du ZIP...");
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      
+      generatedFiles.forEach((file) => {
+        zip.file(file.name, file.blob);
+      });
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${entityName}_etsy_export.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("ZIP téléchargé !");
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur lors de la création du ZIP");
+    }
   };
 
   return (
@@ -273,8 +317,20 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
               </div>
             </div>
 
+            <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+              <Checkbox
+                id="include-promo"
+                checked={includePromoVisual}
+                onCheckedChange={(checked) => setIncludePromoVisual(!!checked)}
+              />
+              <Label htmlFor="include-promo" className="font-medium cursor-pointer flex items-center gap-2">
+                <Image className="h-4 w-4 text-primary" />
+                Visuel promo Etsy (1080x1080)
+              </Label>
+            </div>
+
             <p className="text-xs text-muted-foreground">
-              {cards.length} carte{cards.length > 1 ? "s" : ""} • {colorModes.length} format{colorModes.length > 1 ? "s" : ""}
+              {cards.length} carte{cards.length > 1 ? "s" : ""} • {colorModes.length} PDF{colorModes.length > 1 ? "s" : ""}{includePromoVisual ? " + 1 visuel" : ""}
             </p>
           </div>
         )}
@@ -296,13 +352,12 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
               <CheckCircle2 className="h-4 w-4" />
               {generatedFiles.length} fichier(s) prêt(s) !
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
               {generatedFiles.map((file, idx) => (
                 <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                  <span className="text-sm font-medium">{file.name}</span>
-                  <Button size="sm" variant="outline" onClick={() => handleDownload(file)}>
-                    <Download className="h-3 w-3 mr-1" />
-                    Télécharger
+                  <span className="text-sm font-medium truncate flex-1">{file.name}</span>
+                  <Button size="sm" variant="ghost" onClick={() => handleDownload(file)}>
+                    <Download className="h-3 w-3" />
                   </Button>
                 </div>
               ))}
@@ -310,22 +365,22 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           {!generating && generatedFiles.length === 0 && (
-            <Button onClick={handleGenerate} disabled={colorModes.length === 0 || cards.length === 0}>
-              Générer ({colorModes.length} PDF{colorModes.length > 1 ? "s" : ""})
-            </Button>
-          )}
-          {!generating && generatedFiles.length > 1 && (
-            <Button onClick={handleDownloadAll}>
-              <Download className="mr-2 h-4 w-4" />
-              Tout télécharger
+            <Button onClick={handleGenerate} disabled={colorModes.length === 0 || cards.length === 0} className="w-full sm:w-auto">
+              Générer ({colorModes.length + (includePromoVisual ? 1 : 0)} fichier{colorModes.length + (includePromoVisual ? 1 : 0) > 1 ? "s" : ""})
             </Button>
           )}
           {!generating && generatedFiles.length > 0 && (
-            <Button variant="outline" onClick={() => { setGeneratedFiles([]); setColorModes(["color"]); setProgress(0); }}>
-              Nouveau export
-            </Button>
+            <>
+              <Button onClick={handleDownloadZip} className="w-full sm:w-auto">
+                <Archive className="mr-2 h-4 w-4" />
+                Télécharger ZIP
+              </Button>
+              <Button variant="outline" onClick={() => { setGeneratedFiles([]); setColorModes(["color"]); setProgress(0); }} className="w-full sm:w-auto">
+                Nouveau export
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>

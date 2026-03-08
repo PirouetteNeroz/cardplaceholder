@@ -45,6 +45,12 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
     );
   };
 
+  const toggleColorMode = (cm: "color" | "grayscale") => {
+    setColorModes((prev) =>
+      prev.includes(cm) ? prev.filter((c) => c !== cm) : [...prev, cm]
+    );
+  };
+
   const handleGenerate = async () => {
     if (!setDetail || selectedModes.length === 0) return;
     setGenerating(true);

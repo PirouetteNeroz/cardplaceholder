@@ -129,26 +129,37 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   };
 
   const handleGenerate = async () => {
-    if (!setDetail || selectedModes.length === 0 || colorModes.length === 0) return;
+    if (!setDetail || selectedModes.length === 0 || colorModes.length === 0 || selectedPdfLangs.length === 0) return;
     setGenerating(true);
     setGeneratedFiles([]);
     const files: GeneratedFile[] = [];
-    const totalJobs = selectedModes.length * colorModes.length;
+    const totalJobs = selectedModes.length * colorModes.length * selectedPdfLangs.length;
     let jobIndex = 0;
 
-    for (const mode of selectedModes) {
-      for (const colorMode of colorModes) {
-        jobIndex++;
-        const isGrayscale = colorMode === "grayscale";
-        const colorLabel = isGrayscale ? "N&B" : "Couleur";
-        setCurrentFileIndex(jobIndex);
-        setCurrentStep(`Traitement (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
-        setProgress(0);
+    for (const pdfLang of selectedPdfLangs) {
+      // Fetch set detail for this language
+      let langSetDetail: SetDetail;
+      try {
+        langSetDetail = await fetchSetDetail(pdfLang, setDetail.id);
+      } catch {
+        toast.error(`Impossible de charger le set en ${pdfLang.toUpperCase()}`);
+        continue;
+      }
 
-        try {
-          const cards = await processCards(lang, setDetail, mode, (pct) => {
-            setProgress(pct * 0.3);
-          });
+      for (const mode of selectedModes) {
+        for (const colorMode of colorModes) {
+          jobIndex++;
+          const isGrayscale = colorMode === "grayscale";
+          const colorLabel = isGrayscale ? "N&B" : "Couleur";
+          const langLabel = pdfLang.toUpperCase();
+          setCurrentFileIndex(jobIndex);
+          setCurrentStep(`${langLabel} — ${MODES.find(m => m.value === mode)?.label} — ${colorLabel}...`);
+          setProgress(0);
+
+          try {
+            const cards = await processCards(pdfLang, langSetDetail, mode, (pct) => {
+              setProgress(pct * 0.3);
+            });
 
           setCurrentStep(`Génération du PDF (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
           const { jsPDF } = await import("jspdf");

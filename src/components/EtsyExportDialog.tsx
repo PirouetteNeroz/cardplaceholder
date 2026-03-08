@@ -397,7 +397,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!generating && !generatingVisual) setOpen(v); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!generating && !generatingVisual && !generatingPng) setOpen(v); }}>
       <DialogTrigger asChild>
         <Button variant="outline" disabled={disabled}>
           <ShoppingBag className="mr-2 h-4 w-4" />

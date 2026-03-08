@@ -58,6 +58,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [selectedModes, setSelectedModes] = useState<ExportMode[]>([]);
   const [colorModes, setColorModes] = useState<("color" | "grayscale")[]>(["color"]);
+  const [selectedPdfLangs, setSelectedPdfLangs] = useState<Lang[]>([lang]);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState("");

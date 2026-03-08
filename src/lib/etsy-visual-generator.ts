@@ -277,34 +277,28 @@ export async function generateEtsyVisual(
 
   onProgress?.(68);
 
-  // === Scattered layout (inspired by reference) ===
-  // Positions: [x, y, w, h, rotation]
-  // Graded: bottom-left, large, slight rotation
-  // Complete: center-left, medium, overlapping
-  // Master: top-center, medium
-  // Grayscale: right side, medium
+  // === Scattered layout — LARGE pages like reference images ===
+  const bigW = 340;
+  const bigH = 480;
+  const medW = 300;
+  const medH = 424;
 
-  const pageW = 260;
-  const pageH = 368;
-  const smallW = 220;
-  const smallH = 312;
+  // Draw order: back to front (furthest back first)
+  // Grayscale - right side, tall
+  drawPageOnCanvas(ctx, grayscalePage, 640, 200, medW, medH, 5);
+  drawBadge(ctx, "Grayscale", 790, 230, "#8b5cf6", 5);
 
-  // Draw order: back to front
-  // Grayscale - right side
-  drawPageOnCanvas(ctx, grayscalePage, 680, 280, smallW, smallH, 4);
-  drawBadge(ctx, "Grayscale", 790, 310, "#8b5cf6", 4);
+  // Master - top center
+  drawPageOnCanvas(ctx, masterPage, 350, 120, medW, medH, -2);
+  drawBadge(ctx, "Master Set", 500, 150, "#3b82f6", -2);
 
-  // Master - top center-right
-  drawPageOnCanvas(ctx, masterPage, 440, 180, smallW, smallH, -3);
-  drawBadge(ctx, "Master Set", 550, 210, "#3b82f6", -3);
+  // Complete - center-left, overlapping
+  drawPageOnCanvas(ctx, completePage, 140, 260, bigW, bigH, -6);
+  drawBadge(ctx, "Complete Set", 310, 290, "#f97316", -6);
 
-  // Complete - center-left
-  drawPageOnCanvas(ctx, completePage, 220, 320, pageW, pageH, -5);
-  drawBadge(ctx, "Complete Set", 350, 350, "#f97316", -5);
-
-  // Graded - bottom-left, largest & most prominent
-  drawPageOnCanvas(ctx, gradedPage, 30, 480, pageW + 30, pageH + 42, -8);
-  drawBadge(ctx, "Graded Set", 175, 520, "#ef4444", -8);
+  // Graded - bottom-left, largest & most prominent (front)
+  drawPageOnCanvas(ctx, gradedPage, -10, 420, bigW + 40, bigH + 56, -10);
+  drawBadge(ctx, "Graded Set", 180, 465, "#ef4444", -10);
 
   onProgress?.(75);
 

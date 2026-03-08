@@ -10,13 +10,13 @@ import type { Lang, CardListItem } from "@/lib/tcgdex-api";
 import { toast } from "sonner";
 
 const BG_PRESETS = [
+  { color: "#e91e8c", label: "Rose" },
   { color: "#2d1b69", label: "Violet" },
   { color: "#1a3a1a", label: "Vert" },
   { color: "#691b1b", label: "Rouge" },
   { color: "#1b3569", label: "Bleu" },
   { color: "#694b1b", label: "Or" },
   { color: "#1a1a1a", label: "Noir" },
-  { color: "#2d2d2d", label: "Gris" },
   { color: "#0d3b4f", label: "Cyan" },
 ];
 
@@ -42,7 +42,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
   const [maxPagesPerPDF, setMaxPagesPerPDF] = useState(15);
   const [includePromoVisual, setIncludePromoVisual] = useState(true);
-  const [bgColor, setBgColor] = useState("#2d1b69");
+  const [bgColor, setBgColor] = useState("#e91e8c");
 
   const toggleColorMode = (cm: "color" | "grayscale") => {
     setColorModes((prev) =>

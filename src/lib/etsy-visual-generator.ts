@@ -1,9 +1,9 @@
 import type { SetDetail, Lang } from "@/lib/tcgdex-api";
-import { fetchSeriesDetail } from "@/lib/tcgdex-api";
+import { fetchSeriesDetail, processCards, type ExportMode } from "@/lib/tcgdex-api";
+import { loadCardWithOverlays } from "@/lib/pdf-utils";
 
 const SIZE = 1080;
 
-// Flag emoji to image mapping (using country flag CDN)
 const FLAG_URLS: Record<Lang, string> = {
   fr: "https://flagcdn.com/w80/fr.png",
   en: "https://flagcdn.com/w80/gb.png",
@@ -14,10 +14,10 @@ const FLAG_URLS: Record<Lang, string> = {
   ja: "https://flagcdn.com/w80/jp.png",
 };
 
-const MODE_BADGES: { label: string; color: string }[] = [
-  { label: "Complete Set", color: "#F97316" },
-  { label: "Master Set", color: "#3B82F6" },
-  { label: "Graded Set", color: "#EF4444" },
+const MODE_CONFIGS: { mode: ExportMode; label: string; badgeColor: string }[] = [
+  { mode: "complete", label: "Complete Set", badgeColor: "#22c55e" },
+  { mode: "master", label: "Master Set", badgeColor: "#3b82f6" },
+  { mode: "graded", label: "Graded Set", badgeColor: "#ef4444" },
 ];
 
 async function loadImage(url: string): Promise<HTMLImageElement> {
@@ -47,41 +47,7 @@ function roundRect(
   ctx.closePath();
 }
 
-function drawCardWithShadow(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  x: number, y: number, w: number, h: number,
-  rotation: number = 0
-) {
-  ctx.save();
-  ctx.translate(x + w / 2, y + h / 2);
-  ctx.rotate((rotation * Math.PI) / 180);
-
-  // Shadow
-  ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
-  ctx.shadowBlur = 15;
-  ctx.shadowOffsetX = 4;
-  ctx.shadowOffsetY = 4;
-
-  // Card border
-  const radius = 10;
-  roundRect(ctx, -w / 2, -h / 2, w, h, radius);
-  ctx.fillStyle = "#fff";
-  ctx.fill();
-  ctx.shadowColor = "transparent";
-
-  // Clip and draw
-  ctx.save();
-  roundRect(ctx, -w / 2 + 2, -h / 2 + 2, w - 4, h - 4, radius - 2);
-  ctx.clip();
-  ctx.drawImage(img, -w / 2 + 2, -h / 2 + 2, w - 4, h - 4);
-  ctx.restore();
-
-  ctx.restore();
-}
-
 export function hexToGradient(hex: string): { start: string; mid: string; end: string } {
-  // Darken the hex color for gradient edges
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
@@ -93,6 +59,132 @@ export function hexToGradient(hex: string): { start: string; mid: string; end: s
     mid: hex,
     end: toHex(darken(r, 0.5), darken(g, 0.5), darken(b, 0.5)),
   };
+}
+
+/** Generate a mini PDF page preview (3x3 card grid) on an offscreen canvas */
+async function generatePagePreview(
+  cardImages: (string | null)[],
+  grayscale: boolean = false
+): Promise<HTMLCanvasElement> {
+  const pageW = 420;
+  const pageH = 594; // A4 ratio
+  const page = document.createElement("canvas");
+  page.width = pageW;
+  page.height = pageH;
+  const pctx = page.getContext("2d")!;
+
+  // White page background
+  pctx.fillStyle = "#ffffff";
+  pctx.fillRect(0, 0, pageW, pageH);
+
+  const cardW = 126;
+  const cardH = 176;
+  const marginX = (pageW - cardW * 3) / 2;
+  const marginY = 15;
+  let drawn = 0;
+
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      const idx = row * 3 + col;
+      if (idx >= cardImages.length) break;
+      const dataUrl = cardImages[idx];
+      if (!dataUrl) continue;
+
+      const x = marginX + col * cardW;
+      const y = marginY + row * cardH;
+
+      try {
+        const img = await loadImage(dataUrl);
+        pctx.drawImage(img, x, y, cardW, cardH);
+        drawn++;
+      } catch {
+        // skip
+      }
+    }
+  }
+
+  // Grayscale filter
+  if (grayscale && drawn > 0) {
+    const imageData = pctx.getImageData(0, 0, pageW, pageH);
+    const data = imageData.data;
+    for (let p = 0; p < data.length; p += 4) {
+      const gray = data[p] * 0.299 + data[p + 1] * 0.587 + data[p + 2] * 0.114;
+      data[p] = gray;
+      data[p + 1] = gray;
+      data[p + 2] = gray;
+    }
+    pctx.putImageData(imageData, 0, 0);
+  }
+
+  return page;
+}
+
+/** Draw a page preview with shadow and rotation on the main canvas */
+function drawPageOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  page: HTMLCanvasElement,
+  x: number, y: number, w: number, h: number,
+  rotation: number = 0
+) {
+  ctx.save();
+  ctx.translate(x + w / 2, y + h / 2);
+  ctx.rotate((rotation * Math.PI) / 180);
+
+  // Shadow
+  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+  ctx.shadowBlur = 20;
+  ctx.shadowOffsetX = 5;
+  ctx.shadowOffsetY = 5;
+
+  // Page background
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.shadowColor = "transparent";
+
+  // Draw page content
+  ctx.drawImage(page, -w / 2, -h / 2, w, h);
+
+  // Subtle border
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-w / 2, -h / 2, w, h);
+
+  ctx.restore();
+}
+
+/** Draw a badge label */
+function drawBadge(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number, y: number,
+  color: string,
+  rotation: number = 0
+) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate((rotation * Math.PI) / 180);
+
+  ctx.font = "bold 22px Arial, sans-serif";
+  const textW = ctx.measureText(text).width;
+  const bw = textW + 36;
+  const bh = 38;
+
+  // Shadow
+  ctx.shadowColor = "rgba(0,0,0,0.3)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
+
+  roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 8);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 0, 1);
+
+  ctx.restore();
 }
 
 export async function generateEtsyVisual(
@@ -107,96 +199,94 @@ export async function generateEtsyVisual(
   canvas.height = SIZE;
   const ctx = canvas.getContext("2d")!;
 
-  onProgress?.(5);
+  onProgress?.(2);
 
-  // === Background gradient ===
-  const colors = hexToGradient(bgColor || "#2d1b69");
-  const bgGrad = ctx.createLinearGradient(0, 0, SIZE, SIZE);
-  bgGrad.addColorStop(0, colors.start);
-  bgGrad.addColorStop(0.5, colors.mid);
-  bgGrad.addColorStop(1, colors.end);
-  ctx.fillStyle = bgGrad;
+  // === Solid background ===
+  ctx.fillStyle = bgColor || "#e91e8c";
   ctx.fillRect(0, 0, SIZE, SIZE);
 
-  // Decorative diagonal stripes
-  ctx.save();
-  ctx.globalAlpha = 0.08;
-  for (let i = -SIZE; i < SIZE * 2; i += 60) {
-    ctx.beginPath();
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i + SIZE, SIZE);
-    ctx.lineWidth = 20;
-    ctx.strokeStyle = "#fff";
-    ctx.stroke();
-  }
-  ctx.restore();
+  onProgress?.(5);
 
-  onProgress?.(10);
-
-  // === Load set logo ===
-  let logoImg: HTMLImageElement | null = null;
-  if (setDetail.logo) {
-    try {
-      logoImg = await loadImage(setDetail.logo);
-    } catch {
-      // skip logo
-    }
-  }
-
-  onProgress?.(15);
-
-  // === Load sample card images ===
-  const sampleCards = setDetail.cards.slice(0, 8);
-  const cardImages: (HTMLImageElement | null)[] = [];
+  // === Load card images for page previews ===
+  // We need ~27 cards (3 pages x 9 cards) for the collage
+  const sampleCards = setDetail.cards.slice(0, 27);
+  const cardDataUrls: (string | null)[] = [];
 
   for (let i = 0; i < sampleCards.length; i++) {
     const card = sampleCards[i];
     const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${card.localId}/high.png`;
     try {
-      const img = await loadImage(imgUrl);
-      cardImages.push(img);
+      const dataUrl = await loadCardWithOverlays(imgUrl, {
+        reverse: false,
+        grayscale: false,
+      });
+      cardDataUrls.push(dataUrl);
     } catch {
-      cardImages.push(null);
+      cardDataUrls.push(null);
     }
-    onProgress?.(15 + ((i + 1) / sampleCards.length) * 45);
+    onProgress?.(5 + ((i + 1) / sampleCards.length) * 40);
   }
 
-  const fanCards = cardImages.filter(Boolean) as HTMLImageElement[];
-  const cardW = 150;
-  const cardH = 210;
+  onProgress?.(45);
 
-  // === Draw scattered background cards (corners) ===
-  const cornerPositions = [
-    { x: -20, y: -10, r: -18, s: 0.9 },
-    { x: SIZE - cardW * 0.9 + 20, y: -10, r: 15, s: 0.9 },
-    { x: -20, y: SIZE - cardH * 0.85 - 40, r: 12, s: 0.85 },
-    { x: SIZE - cardW * 0.85 + 20, y: SIZE - cardH * 0.85 - 40, r: -10, s: 0.85 },
-    { x: SIZE / 2 - cardW * 0.7 / 2 - 280, y: SIZE / 2 - cardH * 0.7 / 2 + 20, r: -6, s: 0.7 },
-    { x: SIZE / 2 - cardW * 0.7 / 2 + 280, y: SIZE / 2 - cardH * 0.7 / 2 + 20, r: 6, s: 0.7 },
-  ];
+  // === Generate page previews for each mode ===
+  const pageW = 280;
+  const pageH = 396;
 
-  ctx.globalAlpha = 0.35;
-  cornerPositions.forEach((pos, i) => {
-    if (fanCards[i]) {
-      drawCardWithShadow(ctx, fanCards[i], pos.x, pos.y, cardW * pos.s, cardH * pos.s, pos.r);
-    }
-  });
-  ctx.globalAlpha = 1;
+  // Complete Set page (cards 0-8)
+  const completePage = await generatePagePreview(cardDataUrls.slice(0, 9));
+  // Master Set page (cards 9-17)  
+  const masterPage = await generatePagePreview(
+    cardDataUrls.slice(9, 18).length >= 9 ? cardDataUrls.slice(9, 18) : cardDataUrls.slice(0, 9)
+  );
+  // Graded Set page (cards 18-26)
+  const gradedPage = await generatePagePreview(
+    cardDataUrls.slice(18, 27).length >= 9 ? cardDataUrls.slice(18, 27) : cardDataUrls.slice(0, 9)
+  );
+  // Grayscale page
+  const grayscalePage = await generatePagePreview(cardDataUrls.slice(0, 9), true);
 
-  // === Two main cards flanking the logo ===
-  if (fanCards[0]) {
-    drawCardWithShadow(ctx, fanCards[0], SIZE / 2 - 290, SIZE / 2 - cardH / 2 + 30, cardW, cardH, -7);
-  }
-  if (fanCards[1]) {
-    drawCardWithShadow(ctx, fanCards[1], SIZE / 2 + 140, SIZE / 2 - cardH / 2 + 30, cardW, cardH, 7);
-  }
+  onProgress?.(55);
+
+  // === Draw pages in collage layout matching reference ===
+  // Grayscale - top right, slightly rotated
+  drawPageOnCanvas(ctx, grayscalePage, 640, -30, pageW * 0.85, pageH * 0.85, 5);
+
+  // Complete Set - center left, overlapping
+  drawPageOnCanvas(ctx, completePage, 120, 130, pageW, pageH, -3);
+
+  // Master Set - center, slightly behind
+  drawPageOnCanvas(ctx, masterPage, 330, 60, pageW * 0.95, pageH * 0.95, 2);
+
+  // Graded Set - bottom left
+  drawPageOnCanvas(ctx, gradedPage, -40, 450, pageW, pageH, -5);
+
+  // Another graded variation bottom
+  drawPageOnCanvas(ctx, gradedPage, 150, 550, pageW * 0.9, pageH * 0.9, 3);
+
+  onProgress?.(65);
+
+  // === Draw mode badges near their pages ===
+  drawBadge(ctx, "Grayscale", 780, 50, "#6b7280", 5);
+  drawBadge(ctx, "Complete Set", 220, 200, "#22c55e", -5);
+  drawBadge(ctx, "Master Set", 480, 140, "#3b82f6", 3);
+  drawBadge(ctx, "Graded Set", 100, 520, "#ef4444", -8);
 
   onProgress?.(70);
 
   // === Set logo (large, centered) ===
+  let logoImg: HTMLImageElement | null = null;
+  if (setDetail.logo) {
+    try {
+      logoImg = await loadImage(setDetail.logo);
+    } catch {
+      // skip
+    }
+  }
+
   if (logoImg) {
-    const maxLogoW = 420;
-    const maxLogoH = 200;
+    const maxLogoW = 450;
+    const maxLogoH = 250;
     const logoAspect = logoImg.width / logoImg.height;
     let logoW = maxLogoW;
     let logoH = logoW / logoAspect;
@@ -205,148 +295,78 @@ export async function generateEtsyVisual(
       logoW = logoH * logoAspect;
     }
 
-    // Glow behind logo
+    const logoX = SIZE / 2 - logoW / 2 + 40;
+    const logoY = SIZE / 2 - logoH / 2 + 30;
+
+    // White glow/shadow behind logo for readability
     ctx.save();
-    ctx.shadowColor = "rgba(255, 215, 0, 0.5)";
-    ctx.shadowBlur = 40;
-    ctx.drawImage(logoImg, SIZE / 2 - logoW / 2, 60, logoW, logoH);
+    ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+    ctx.shadowBlur = 30;
+    ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
     ctx.restore();
 
-    // Draw logo again crisp on top
-    ctx.drawImage(logoImg, SIZE / 2 - logoW / 2, 60, logoW, logoH);
-  } else {
-    // Fallback: text title
-    ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 3;
-    ctx.fillStyle = "#FFD700";
-    ctx.font = "bold 56px Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillText(setDetail.name, SIZE / 2, 80);
-    ctx.restore();
-  }
-
-  // === Series logo below set logo ===
-  let serieLogoImg: HTMLImageElement | null = null;
-  try {
-    const serieDetail = await fetchSeriesDetail(lang, setDetail.serie.id);
-    if (serieDetail.logo) {
-      serieLogoImg = await loadImage(serieDetail.logo);
-    }
-  } catch {
-    // skip
-  }
-
-  if (serieLogoImg) {
-    const maxSerieW = 300;
-    const maxSerieH = 80;
-    const serieAspect = serieLogoImg.width / serieLogoImg.height;
-    let serieW = maxSerieW;
-    let serieH = serieW / serieAspect;
-    if (serieH > maxSerieH) {
-      serieH = maxSerieH;
-      serieW = serieH * serieAspect;
-    }
-    ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-    ctx.shadowBlur = 10;
-    ctx.drawImage(serieLogoImg, SIZE / 2 - serieW / 2, 270, serieW, serieH);
-    ctx.restore();
+    // Crisp logo on top
+    ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
   } else {
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = 15;
+    ctx.shadowOffsetY = 4;
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 28px Arial, sans-serif";
+    ctx.font = "bold 64px Arial, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(setDetail.serie.name, SIZE / 2, 280);
-    ctx.restore();
-  }
-
-  // === Set name if logo exists ===
-  if (logoImg) {
-    ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-    ctx.shadowBlur = 6;
-    ctx.fillStyle = "#FFD700";
-    ctx.font = "bold 40px Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(setDetail.name, SIZE / 2, 315);
+    ctx.textBaseline = "middle";
+    ctx.fillText(setDetail.name, SIZE / 2, SIZE / 2);
     ctx.restore();
   }
 
   onProgress?.(80);
 
-  // === Language flags ===
-  const flagSize = 36;
-  const flagGap = 12;
-  const totalFlagsW = langs.length * flagSize + (langs.length - 1) * flagGap;
-  let flagX = SIZE / 2 - totalFlagsW / 2;
-  const flagY = 370;
+  // === "Download, Print, Cut" top left ===
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 2;
+  ctx.fillStyle = "#000";
+  ctx.font = "bold 36px Arial, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText("Download, Print, Cut", 25, 20);
+  ctx.restore();
+
+  // === Language flags (top left, below text) ===
+  const flagSize = 40;
+  const flagGap = 8;
+  let flagX = 30;
+  const flagY = 70;
 
   for (const l of langs) {
     try {
       const flagImg = await loadImage(FLAG_URLS[l]);
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(flagX + flagSize / 2, flagY + flagSize / 2, flagSize / 2, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.drawImage(flagImg, flagX, flagY, flagSize, flagSize);
+      ctx.shadowColor = "rgba(0,0,0,0.3)";
+      ctx.shadowBlur = 4;
+      ctx.drawImage(flagImg, flagX, flagY, flagSize, flagSize * 0.67);
       ctx.restore();
-
-      ctx.beginPath();
-      ctx.arc(flagX + flagSize / 2, flagY + flagSize / 2, flagSize / 2, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255,255,255,0.5)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
     } catch {
       // skip
     }
     flagX += flagSize + flagGap;
   }
 
-  // === Mode badges (bottom area) ===
-  const badgeStartY = SIZE - 220;
-  const badgeSpacing = 44;
-  MODE_BADGES.forEach((badge, i) => {
-    const bx = SIZE / 2;
-    const by = badgeStartY + i * badgeSpacing;
-    ctx.font = "bold 18px Arial, sans-serif";
-    const textWidth = ctx.measureText(badge.label).width;
-    const bw = Math.max(textWidth + 50, 200);
+  onProgress?.(88);
 
-    roundRect(ctx, bx - bw / 2, by - 17, bw, 36, 18);
-    ctx.fillStyle = badge.color;
-    ctx.fill();
-
-    ctx.strokeStyle = "rgba(255,255,255,0.3)";
-    ctx.lineWidth = 1.5;
-    roundRect(ctx, bx - bw / 2, by - 17, bw, 36, 18);
-    ctx.stroke();
-
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(badge.label, bx, by + 1);
-  });
-
-  // === "Download, Print, Cut" ===
+  // === "✨ Download ✨" bottom center ===
   ctx.save();
   ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-  ctx.shadowBlur = 8;
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 30px Arial, sans-serif";
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = "#000";
+  ctx.font = "bold 52px Arial, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("Download, Print, Cut", SIZE / 2, SIZE - 60);
+  ctx.textBaseline = "bottom";
+  ctx.fillText("✨ Download ✨", SIZE / 2, SIZE - 30);
   ctx.restore();
-
-  // === "Color & Grayscale" ===
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.font = "20px Arial, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Color & Grayscale", SIZE / 2, SIZE - 30);
 
   onProgress?.(95);
 

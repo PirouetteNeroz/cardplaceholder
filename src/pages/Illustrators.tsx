@@ -301,16 +301,20 @@ const Illustrators = () => {
                       key={card.id}
                       className="bg-card rounded-lg p-2 text-center card-glow card-glow-hover transition-transform hover:-translate-y-1 border-t-4 border-t-primary"
                     >
-                      {card.image && (
-                        <img
-                          src={`${card.image}/high.png`}
-                          alt={card.name}
-                          className="w-full rounded"
-                          loading="lazy"
-                        />
-                      )}
+                      <div className="relative">
+                        {card.image && (
+                          <img
+                            src={`${card.image}/high.png`}
+                            alt={card.name}
+                            className="w-full rounded"
+                            loading="lazy"
+                          />
+                        )}
+                        <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded">
+                          {card.setName} #{card.localId}
+                        </span>
+                      </div>
                       <p className="text-xs font-semibold mt-2 truncate text-card-foreground">{card.name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{card.serieName} #{card.localId}</p>
                     </div>
                   ))}
                 </div>

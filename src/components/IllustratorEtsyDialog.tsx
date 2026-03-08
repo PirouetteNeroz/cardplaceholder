@@ -88,51 +88,89 @@ export function IllustratorEtsyDialog({ illustratorName, cards, lang, disabled }
             setCurrentStep(`${colorLabel} — Partie ${part + 1}/${totalParts} — Carte ${globalIdx + 1}/${cards.length}`);
             setProgress(((jobIndex - 1) / totalJobs + ((globalIdx + 1) / cards.length) / totalJobs) * 100);
 
+            const canvasW = 734;
+            const canvasH = 1024;
+            const canvas = document.createElement("canvas");
+            canvas.width = canvasW;
+            canvas.height = canvasH;
+            const ctx = canvas.getContext("2d")!;
+
+            let hasImage = false;
             if (card.image) {
               const imgUrl = `${card.image}/high.png`;
               try {
                 const resp = await fetch(imgUrl, { mode: "cors" });
                 const blob = await resp.blob();
                 const img = await createImageBitmap(blob);
-                const canvas = document.createElement("canvas");
                 canvas.width = img.width;
                 canvas.height = img.height;
-                const ctx = canvas.getContext("2d")!;
                 ctx.drawImage(img, 0, 0);
-
-                // Grayscale conversion
-                if (isGrayscale) {
-                  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                  const data = imageData.data;
-                  for (let p = 0; p < data.length; p += 4) {
-                    const gray = data[p] * 0.299 + data[p + 1] * 0.587 + data[p + 2] * 0.114;
-                    data[p] = gray;
-                    data[p + 1] = gray;
-                    data[p + 2] = gray;
-                  }
-                  ctx.putImageData(imageData, 0, 0);
-                }
-
-                // Draw set name + number overlay
-                const labelText = `${card.setName || ""} #${card.localId}`;
-                const fontSize = Math.round(img.width * 0.045);
-                ctx.font = `bold ${fontSize}px Arial`;
-                const textWidth = ctx.measureText(labelText).width;
-                const padding = fontSize * 0.4;
-                const boxX = img.width - textWidth - padding * 2 - 8;
-                const boxY = img.height - fontSize - padding * 2 - 8;
-                ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
-                ctx.roundRect(boxX, boxY, textWidth + padding * 2, fontSize + padding * 2, 6);
-                ctx.fill();
-                ctx.fillStyle = "#ffffff";
-                ctx.fillText(labelText, boxX + padding, boxY + padding + fontSize * 0.85);
-
-                const dataUrl = canvas.toDataURL("image/png");
-                doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
+                hasImage = true;
               } catch {
-                // skip
+                // fallback below
               }
             }
+
+            if (!hasImage) {
+              // Draw placeholder with Pokéball
+              canvas.width = canvasW;
+              canvas.height = canvasH;
+              ctx.fillStyle = isGrayscale ? "#e0e0e0" : "#f0f0f0";
+              ctx.fillRect(0, 0, canvasW, canvasH);
+
+              const cx = canvasW / 2, cy = canvasH / 2, r = canvasW * 0.2;
+              ctx.strokeStyle = isGrayscale ? "#888" : "#cc0000";
+              ctx.lineWidth = r * 0.12;
+              ctx.beginPath();
+              ctx.arc(cx, cy, r, 0, Math.PI * 2);
+              ctx.stroke();
+              // horizontal line
+              ctx.beginPath();
+              ctx.moveTo(cx - r, cy);
+              ctx.lineTo(cx + r, cy);
+              ctx.stroke();
+              // center circle
+              ctx.beginPath();
+              ctx.arc(cx, cy, r * 0.25, 0, Math.PI * 2);
+              ctx.stroke();
+              // top half fill
+              ctx.fillStyle = isGrayscale ? "#aaa" : "#cc0000";
+              ctx.beginPath();
+              ctx.arc(cx, cy, r - ctx.lineWidth / 2, Math.PI, 0);
+              ctx.closePath();
+              ctx.fill();
+            }
+
+            // Grayscale conversion (for loaded images)
+            if (isGrayscale && hasImage) {
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const data = imageData.data;
+              for (let p = 0; p < data.length; p += 4) {
+                const gray = data[p] * 0.299 + data[p + 1] * 0.587 + data[p + 2] * 0.114;
+                data[p] = gray;
+                data[p + 1] = gray;
+                data[p + 2] = gray;
+              }
+              ctx.putImageData(imageData, 0, 0);
+            }
+
+            // Draw set name + number overlay
+            const labelText = `${card.setName || ""} #${card.localId}`;
+            const fontSize = Math.round(canvas.width * 0.045);
+            ctx.font = `bold ${fontSize}px Arial`;
+            const textWidth = ctx.measureText(labelText).width;
+            const padding = fontSize * 0.4;
+            const boxX = canvas.width - textWidth - padding * 2 - 8;
+            const boxY = canvas.height - fontSize - padding * 2 - 8;
+            ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY, textWidth + padding * 2, fontSize + padding * 2, 6);
+            ctx.fill();
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(labelText, boxX + padding, boxY + padding + fontSize * 0.85);
+
+            const dataUrl = canvas.toDataURL("image/png");
+            doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
 
             x += cardW;
             count++;

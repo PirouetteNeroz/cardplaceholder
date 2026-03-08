@@ -20,11 +20,6 @@ const BG_PRESETS = [
   { color: "#0d3b4f", label: "Cyan" },
 ];
 
-interface GeneratedFile {
-  name: string;
-  blob: Blob;
-}
-
 const AVAILABLE_LANGS: { value: Lang; label: string }[] = [
   { value: "fr", label: "🇫🇷 FR" },
   { value: "en", label: "🇬🇧 EN" },
@@ -34,6 +29,11 @@ const AVAILABLE_LANGS: { value: Lang; label: string }[] = [
   { value: "pt", label: "🇵🇹 PT" },
   { value: "ja", label: "🇯🇵 JA" },
 ];
+
+interface GeneratedFile {
+  name: string;
+  blob: Blob;
+}
 
 interface Props {
   entityName: string | null;
@@ -56,24 +56,26 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
   const [includePromoVisual, setIncludePromoVisual] = useState(true);
   const [bgColor, setBgColor] = useState("#e91e8c");
 
-  const togglePdfLang = (l: Lang) => {
-    setSelectedPdfLangs((prev) =>
-      prev.includes(l) ? (prev.length > 1 ? prev.filter((x) => x !== l) : prev) : [...prev, l]
-    );
-  };
-
   const toggleColorMode = (cm: "color" | "grayscale") => {
     setColorModes((prev) =>
       prev.includes(cm) ? prev.filter((c) => c !== cm) : [...prev, cm]
     );
   };
 
+  const togglePdfLang = (l: Lang) => {
+    setSelectedPdfLangs((prev) =>
+      prev.includes(l) ? (prev.length > 1 ? prev.filter((x) => x !== l) : prev) : [...prev, l]
+    );
+  };
+
+  const totalFileCount = colorModes.length * selectedPdfLangs.length + (includePromoVisual ? 1 : 0);
+
   const handleGenerate = async () => {
-    if (!entityName || cards.length === 0 || colorModes.length === 0) return;
+    if (!entityName || cards.length === 0 || colorModes.length === 0 || selectedPdfLangs.length === 0) return;
     setGenerating(true);
     setGeneratedFiles([]);
     const files: GeneratedFile[] = [];
-    const totalJobs = colorModes.length + (includePromoVisual ? 1 : 0);
+    const totalJobs = totalFileCount;
     let jobIndex = 0;
 
     // Generate promo visual first
@@ -91,159 +93,150 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
           (pct) => setProgress((jobIndex - 1) / totalJobs * 100 + pct / totalJobs),
           bgColor
         );
-        files.push({
-          name: `${entityName}_promo.png`,
-          blob: promoBlob,
-        });
+        files.push({ name: `${entityName}_promo.png`, blob: promoBlob });
       } catch (e) {
         console.error(e);
         toast.error("Erreur lors de la génération du visuel promo");
       }
     }
 
-    for (const colorMode of colorModes) {
-      jobIndex++;
-      const isGrayscale = colorMode === "grayscale";
-      const colorLabel = isGrayscale ? "N&B" : "Couleur";
-      setCurrentStep(`Génération PDF (${colorLabel})...`);
+    for (const pdfLang of selectedPdfLangs) {
+      let langCards: CardListItem[];
+      if (pdfLang === lang) {
+        langCards = cards;
+      } else if (fetchCardsForLang) {
+        try {
+          setCurrentStep(`Chargement des cartes en ${pdfLang.toUpperCase()}...`);
+          langCards = await fetchCardsForLang(pdfLang);
+        } catch {
+          toast.error(`Impossible de charger les cartes en ${pdfLang.toUpperCase()}`);
+          continue;
+        }
+      } else {
+        langCards = cards; // fallback to current cards
+      }
 
-      try {
-        const { jsPDF } = await import("jspdf");
-        const cardsPerPage = 9;
-        const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF;
-        const totalParts = Math.ceil(cards.length / maxCardsPerPDF);
+      for (const colorMode of colorModes) {
+        jobIndex++;
+        const isGrayscale = colorMode === "grayscale";
+        const colorLabel = isGrayscale ? "N&B" : "Couleur";
+        const langLabel = pdfLang.toUpperCase();
+        setCurrentStep(`${langLabel} — Génération PDF (${colorLabel})...`);
 
-        for (let part = 0; part < totalParts; part++) {
-          const startIdx = part * maxCardsPerPDF;
-          const endIdx = Math.min(startIdx + maxCardsPerPDF, cards.length);
-          const chunk = cards.slice(startIdx, endIdx);
+        try {
+          const { jsPDF } = await import("jspdf");
+          const cardsPerPage = 9;
+          const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF;
+          const totalParts = Math.ceil(langCards.length / maxCardsPerPDF);
 
-          const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+          for (let part = 0; part < totalParts; part++) {
+            const startIdx = part * maxCardsPerPDF;
+            const endIdx = Math.min(startIdx + maxCardsPerPDF, langCards.length);
+            const chunk = langCards.slice(startIdx, endIdx);
 
-          // Cover page
-          doc.setFontSize(32);
-          doc.setFont("helvetica", "bold");
-          doc.text(entityName, 105, 60, { align: "center" });
-          doc.setFontSize(18);
-          doc.text(`${entityLabel} Pokémon TCG`, 105, 75, { align: "center" });
-          doc.setFontSize(14);
-          doc.text(`Cartes: ${cards.length}`, 30, 200);
-          doc.text(`Langue: ${lang.toUpperCase()}`, 30, 210);
-          doc.text(`Format: ${colorLabel}`, 30, 220);
-          if (totalParts > 1) doc.text(`Partie ${part + 1} / ${totalParts}`, 30, 230);
-          doc.addPage();
+            const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-          const cardW = 63, cardH = 88;
-          const marginX = (210 - cardW * 3) / 2;
-          let x = marginX, y = 20, count = 0;
+            doc.setFontSize(32);
+            doc.setFont("helvetica", "bold");
+            doc.text(entityName, 105, 60, { align: "center" });
+            doc.setFontSize(18);
+            doc.text(`${entityLabel} Pokémon TCG`, 105, 75, { align: "center" });
+            doc.setFontSize(14);
+            doc.text(`Cartes: ${langCards.length}`, 30, 200);
+            doc.text(`Langue: ${langLabel}`, 30, 210);
+            doc.text(`Format: ${colorLabel}`, 30, 220);
+            if (totalParts > 1) doc.text(`Partie ${part + 1} / ${totalParts}`, 30, 230);
+            doc.addPage();
 
-          for (let i = 0; i < chunk.length; i++) {
-            const card = chunk[i];
-            const globalIdx = startIdx + i;
-            setCurrentStep(`${colorLabel} — Partie ${part + 1}/${totalParts} — Carte ${globalIdx + 1}/${cards.length}`);
-            setProgress(((jobIndex - 1) / totalJobs + ((globalIdx + 1) / cards.length) / totalJobs) * 100);
+            const cardW = 63, cardH = 88;
+            const marginX = (210 - cardW * 3) / 2;
+            let x = marginX, y = 20, count = 0;
 
-            const canvasW = 734;
-            const canvasH = 1024;
-            const canvas = document.createElement("canvas");
-            canvas.width = canvasW;
-            canvas.height = canvasH;
-            const ctx = canvas.getContext("2d")!;
+            for (let i = 0; i < chunk.length; i++) {
+              const card = chunk[i];
+              const globalIdx = startIdx + i;
+              setCurrentStep(`${langLabel} — ${colorLabel} — Carte ${globalIdx + 1}/${langCards.length}`);
+              setProgress(((jobIndex - 1) / totalJobs + ((globalIdx + 1) / langCards.length) / totalJobs) * 100);
 
-            let hasImage = false;
-            if (card.image) {
-              const imgUrl = `${card.image}/high.png`;
-              try {
-                const resp = await fetch(imgUrl, { mode: "cors" });
-                const blob = await resp.blob();
-                const img = await createImageBitmap(blob);
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
-                hasImage = true;
-              } catch {
-                // fallback below
-              }
-            }
-
-            if (!hasImage) {
+              const canvasW = 734, canvasH = 1024;
+              const canvas = document.createElement("canvas");
               canvas.width = canvasW;
               canvas.height = canvasH;
-              ctx.fillStyle = isGrayscale ? "#e0e0e0" : "#f0f0f0";
-              ctx.fillRect(0, 0, canvasW, canvasH);
+              const ctx = canvas.getContext("2d")!;
 
-              const cx = canvasW / 2, cy = canvasH / 2, r = canvasW * 0.2;
-              ctx.strokeStyle = isGrayscale ? "#888" : "#cc0000";
-              ctx.lineWidth = r * 0.12;
-              ctx.beginPath();
-              ctx.arc(cx, cy, r, 0, Math.PI * 2);
-              ctx.stroke();
-              ctx.beginPath();
-              ctx.moveTo(cx - r, cy);
-              ctx.lineTo(cx + r, cy);
-              ctx.stroke();
-              ctx.beginPath();
-              ctx.arc(cx, cy, r * 0.25, 0, Math.PI * 2);
-              ctx.stroke();
-              ctx.fillStyle = isGrayscale ? "#aaa" : "#cc0000";
-              ctx.beginPath();
-              ctx.arc(cx, cy, r - ctx.lineWidth / 2, Math.PI, 0);
-              ctx.closePath();
-              ctx.fill();
-            }
-
-            if (isGrayscale && hasImage) {
-              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-              const data = imageData.data;
-              for (let p = 0; p < data.length; p += 4) {
-                const gray = data[p] * 0.299 + data[p + 1] * 0.587 + data[p + 2] * 0.114;
-                data[p] = gray;
-                data[p + 1] = gray;
-                data[p + 2] = gray;
+              let hasImage = false;
+              if (card.image) {
+                try {
+                  const resp = await fetch(`${card.image}/high.png`, { mode: "cors" });
+                  const blob = await resp.blob();
+                  const img = await createImageBitmap(blob);
+                  canvas.width = img.width;
+                  canvas.height = img.height;
+                  ctx.drawImage(img, 0, 0);
+                  hasImage = true;
+                } catch { /* fallback */ }
               }
-              ctx.putImageData(imageData, 0, 0);
-            }
 
-            const labelText = `${card.setName || ""} #${card.localId}`;
-            const fontSize = Math.round(canvas.width * 0.045);
-            ctx.font = `bold ${fontSize}px Arial`;
-            const textWidth = ctx.measureText(labelText).width;
-            const padding = fontSize * 0.4;
-            const boxX = canvas.width - textWidth - padding * 2 - 8;
-            const boxY = canvas.height - fontSize - padding * 2 - 8;
-            ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
-            ctx.beginPath();
-            ctx.roundRect(boxX, boxY, textWidth + padding * 2, fontSize + padding * 2, 6);
-            ctx.fill();
-            ctx.fillStyle = "#ffffff";
-            ctx.fillText(labelText, boxX + padding, boxY + padding + fontSize * 0.85);
+              if (!hasImage) {
+                canvas.width = canvasW; canvas.height = canvasH;
+                ctx.fillStyle = isGrayscale ? "#e0e0e0" : "#f0f0f0";
+                ctx.fillRect(0, 0, canvasW, canvasH);
+                const cx = canvasW / 2, cy = canvasH / 2, r = canvasW * 0.2;
+                ctx.strokeStyle = isGrayscale ? "#888" : "#cc0000";
+                ctx.lineWidth = r * 0.12;
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy); ctx.stroke();
+                ctx.beginPath(); ctx.arc(cx, cy, r * 0.25, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = isGrayscale ? "#aaa" : "#cc0000";
+                ctx.beginPath(); ctx.arc(cx, cy, r - ctx.lineWidth / 2, Math.PI, 0); ctx.closePath(); ctx.fill();
+              }
 
-            const dataUrl = canvas.toDataURL("image/png");
-            doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
+              if (isGrayscale && hasImage) {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                for (let p = 0; p < data.length; p += 4) {
+                  const gray = data[p] * 0.299 + data[p + 1] * 0.587 + data[p + 2] * 0.114;
+                  data[p] = gray; data[p + 1] = gray; data[p + 2] = gray;
+                }
+                ctx.putImageData(imageData, 0, 0);
+              }
 
-            x += cardW;
-            count++;
-            if (count % 3 === 0) {
-              x = marginX;
-              y += cardH;
-              if (count % 9 === 0 && count < chunk.length) {
-                doc.addPage();
-                x = marginX;
-                y = 20;
+              const labelText = `${card.setName || ""} #${card.localId}`;
+              const fontSize = Math.round(canvas.width * 0.045);
+              ctx.font = `bold ${fontSize}px Arial`;
+              const tw = ctx.measureText(labelText).width;
+              const pad = fontSize * 0.4;
+              const bx = canvas.width - tw - pad * 2 - 8;
+              const by = canvas.height - fontSize - pad * 2 - 8;
+              ctx.fillStyle = "rgba(0,0,0,0.65)";
+              ctx.beginPath(); ctx.roundRect(bx, by, tw + pad * 2, fontSize + pad * 2, 6); ctx.fill();
+              ctx.fillStyle = "#fff";
+              ctx.fillText(labelText, bx + pad, by + pad + fontSize * 0.85);
+
+              doc.addImage(canvas.toDataURL("image/png"), "PNG", x, y, cardW, cardH);
+
+              x += cardW;
+              count++;
+              if (count % 3 === 0) {
+                x = marginX; y += cardH;
+                if (count % 9 === 0 && count < chunk.length) {
+                  doc.addPage(); x = marginX; y = 20;
+                }
               }
             }
+
+            const langSuffix = selectedPdfLangs.length > 1 ? `_${pdfLang}` : "";
+            const colorSuffix = isGrayscale ? "_nb" : "";
+            const partSuffix = totalParts > 1 ? `_part${part + 1}` : "";
+            files.push({
+              name: `${entityName}${langSuffix}${colorSuffix}${partSuffix}.pdf`,
+              blob: doc.output("blob"),
+            });
           }
-
-          const colorSuffix = isGrayscale ? "_nb" : "";
-          const suffix = totalParts > 1 ? `_part${part + 1}` : "";
-          files.push({
-            name: `${entityName}${colorSuffix}${suffix}.pdf`,
-            blob: doc.output("blob"),
-          });
+        } catch (e) {
+          console.error(e);
+          toast.error(`Erreur pour ${pdfLang.toUpperCase()} ${colorLabel}`);
         }
-      } catch (e) {
-        console.error(e);
-        toast.error(`Erreur pour le format ${colorLabel}`);
       }
     }
 
@@ -257,9 +250,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
   const handleDownload = (file: GeneratedFile) => {
     const url = URL.createObjectURL(file.blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = file.name;
-    a.click();
+    a.href = url; a.download = file.name; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -271,9 +262,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
       const zipBlob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = `${entityName}_etsy_export.zip`;
-      a.click();
+      a.href = url; a.download = `${entityName}_etsy_export.zip`; a.click();
       URL.revokeObjectURL(url);
       toast.success("ZIP téléchargé !");
     } catch (e) {
@@ -319,22 +308,41 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
               </p>
               <div className="flex gap-3">
                 <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors flex-1">
-                  <Checkbox
-                    id="illus-color-mode"
-                    checked={colorModes.includes("color")}
-                    onCheckedChange={() => toggleColorMode("color")}
-                  />
+                  <Checkbox id="illus-color-mode" checked={colorModes.includes("color")} onCheckedChange={() => toggleColorMode("color")} />
                   <Label htmlFor="illus-color-mode" className="font-medium cursor-pointer">Couleur</Label>
                 </div>
                 <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors flex-1">
-                  <Checkbox
-                    id="illus-grayscale-mode"
-                    checked={colorModes.includes("grayscale")}
-                    onCheckedChange={() => toggleColorMode("grayscale")}
-                  />
+                  <Checkbox id="illus-grayscale-mode" checked={colorModes.includes("grayscale")} onCheckedChange={() => toggleColorMode("grayscale")} />
                   <Label htmlFor="illus-grayscale-mode" className="font-medium cursor-pointer">Nuances de gris</Label>
                 </div>
               </div>
+            </div>
+
+            {/* PDF Languages selector */}
+            <div>
+              <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                🌍 Langues des PDFs :
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {AVAILABLE_LANGS.map((l) => (
+                  <button
+                    key={l.value}
+                    onClick={() => togglePdfLang(l.value)}
+                    className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                      selectedPdfLangs.includes(l.value)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+              {!fetchCardsForLang && selectedPdfLangs.some(l => l !== lang) && (
+                <p className="text-xs text-amber-500 mt-1">
+                  ⚠️ Les langues autres que {lang.toUpperCase()} utiliseront les mêmes cartes
+                </p>
+              )}
             </div>
 
             {/* Background color for promo */}
@@ -364,11 +372,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
             </div>
 
             <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-              <Checkbox
-                id="include-promo"
-                checked={includePromoVisual}
-                onCheckedChange={(checked) => setIncludePromoVisual(!!checked)}
-              />
+              <Checkbox id="include-promo" checked={includePromoVisual} onCheckedChange={(checked) => setIncludePromoVisual(!!checked)} />
               <Label htmlFor="include-promo" className="font-medium cursor-pointer flex items-center gap-2">
                 <Image className="h-4 w-4 text-primary" />
                 Visuel promo Etsy (1080x1080)
@@ -376,7 +380,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
             </div>
 
             <p className="text-xs text-muted-foreground">
-              {cards.length} carte{cards.length > 1 ? "s" : ""} • {colorModes.length} PDF{colorModes.length > 1 ? "s" : ""}{includePromoVisual ? " + 1 visuel" : ""}
+              {cards.length} carte{cards.length > 1 ? "s" : ""} • {selectedPdfLangs.length} langue{selectedPdfLangs.length > 1 ? "s" : ""} • {totalFileCount} fichier{totalFileCount > 1 ? "s" : ""}
             </p>
           </div>
         )}
@@ -405,21 +409,14 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
                   <div key={idx} className="rounded-lg border bg-muted/30 overflow-hidden">
                     {isImage && (
                       <div className="p-2">
-                        <img
-                          src={URL.createObjectURL(file.blob)}
-                          alt={file.name}
-                          className="w-full rounded border"
-                        />
+                        <img src={URL.createObjectURL(file.blob)} alt={file.name} className="w-full rounded border" />
                       </div>
                     )}
                     <div className="flex items-center justify-between p-3">
                       <span className="text-sm font-medium truncate flex-1">{file.name}</span>
                       <div className="flex gap-1">
                         {!isImage && (
-                          <Button size="sm" variant="ghost" onClick={() => {
-                            const url = URL.createObjectURL(file.blob);
-                            window.open(url, "_blank");
-                          }}>
+                          <Button size="sm" variant="ghost" onClick={() => { window.open(URL.createObjectURL(file.blob), "_blank"); }}>
                             <Eye className="h-3 w-3" />
                           </Button>
                         )}
@@ -437,8 +434,8 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
           {!generating && generatedFiles.length === 0 && (
-            <Button onClick={handleGenerate} disabled={colorModes.length === 0 || cards.length === 0} className="w-full sm:w-auto">
-              Générer ({colorModes.length + (includePromoVisual ? 1 : 0)} fichier{colorModes.length + (includePromoVisual ? 1 : 0) > 1 ? "s" : ""})
+            <Button onClick={handleGenerate} disabled={colorModes.length === 0 || cards.length === 0 || selectedPdfLangs.length === 0} className="w-full sm:w-auto">
+              Générer ({totalFileCount} fichier{totalFileCount > 1 ? "s" : ""})
             </Button>
           )}
           {!generating && generatedFiles.length > 0 && (
@@ -447,7 +444,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
                 <Archive className="mr-2 h-4 w-4" />
                 Télécharger ZIP
               </Button>
-              <Button variant="outline" onClick={() => { setGeneratedFiles([]); setColorModes(["color"]); setProgress(0); }} className="w-full sm:w-auto">
+              <Button variant="outline" onClick={() => { setGeneratedFiles([]); setColorModes(["color"]); setSelectedPdfLangs([lang]); setProgress(0); }} className="w-full sm:w-auto">
                 Nouveau export
               </Button>
             </>

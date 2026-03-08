@@ -80,11 +80,27 @@ function drawCardWithShadow(
   ctx.restore();
 }
 
+export function hexToGradient(hex: string): { start: string; mid: string; end: string } {
+  // Darken the hex color for gradient edges
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const darken = (v: number, f: number) => Math.max(0, Math.round(v * f));
+  const toHex = (r2: number, g2: number, b2: number) =>
+    `#${r2.toString(16).padStart(2, "0")}${g2.toString(16).padStart(2, "0")}${b2.toString(16).padStart(2, "0")}`;
+  return {
+    start: toHex(darken(r, 0.5), darken(g, 0.5), darken(b, 0.5)),
+    mid: hex,
+    end: toHex(darken(r, 0.5), darken(g, 0.5), darken(b, 0.5)),
+  };
+}
+
 export async function generateEtsyVisual(
   setDetail: SetDetail,
   lang: Lang,
   langs: Lang[],
-  onProgress?: (pct: number) => void
+  onProgress?: (pct: number) => void,
+  bgColor?: string
 ): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = SIZE;
@@ -94,10 +110,11 @@ export async function generateEtsyVisual(
   onProgress?.(5);
 
   // === Background gradient ===
+  const colors = hexToGradient(bgColor || "#2d1b69");
   const bgGrad = ctx.createLinearGradient(0, 0, SIZE, SIZE);
-  bgGrad.addColorStop(0, "#1a1035");
-  bgGrad.addColorStop(0.5, "#2d1b69");
-  bgGrad.addColorStop(1, "#1a1035");
+  bgGrad.addColorStop(0, colors.start);
+  bgGrad.addColorStop(0.5, colors.mid);
+  bgGrad.addColorStop(1, colors.end);
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, SIZE, SIZE);
 

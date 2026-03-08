@@ -219,11 +219,18 @@ export async function fetchPokemonNames(lang: Lang): Promise<string[]> {
   return [...names].sort((a, b) => a.localeCompare(b));
 }
 
-export async function fetchCardsByPokemonName(lang: Lang, name: string): Promise<CardListItem[]> {
-  const res = await fetch(`${BASE_URL}/${lang}/cards?name=${encodeURIComponent(name)}`);
+export async function fetchCardsByPokemonName(lang: Lang, baseName: string): Promise<CardListItem[]> {
+  // Fetch all cards and filter by base name match
+  const res = await fetch(`${BASE_URL}/${lang}/cards`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const cards: CardListItem[] = await res.json();
-  let filtered = cards.filter((c) => !c.id.startsWith("tcgp-"));
+  const allCards: CardListItem[] = await res.json();
+  
+  // Filter cards whose base name matches the requested base name
+  let filtered = allCards.filter((c) => {
+    if (c.id.startsWith("tcgp-")) return false;
+    const cardBaseName = extractBasePokemonName(c.name);
+    return cardBaseName.toLowerCase() === baseName.toLowerCase();
+  });
 
   const setIds = [...new Set(filtered.map((c) => c.id.replace(/-[^-]+$/, "")))];
   const setInfoMap: Record<string, { releaseDate: string; setName: string; serieName: string }> = {};

@@ -49,13 +49,12 @@ export function hexToGradient(hex: string): { start: string; mid: string; end: s
   const toHex = (r2: number, g2: number, b2: number) =>
     `#${r2.toString(16).padStart(2, "0")}${g2.toString(16).padStart(2, "0")}${b2.toString(16).padStart(2, "0")}`;
   return {
-    start: toHex(darken(r, 0.3), darken(g, 0.3), darken(b, 0.3)),
+    start: toHex(darken(r, 0.2), darken(g, 0.2), darken(b, 0.2)),
     mid: hex,
-    end: toHex(darken(r, 0.5), darken(g, 0.5), darken(b, 0.5)),
+    end: toHex(darken(r, 0.4), darken(g, 0.4), darken(b, 0.4)),
   };
 }
 
-/** Load 9 card images for a specific mode */
 async function loadModeCards(
   setDetail: SetDetail,
   lang: Lang,
@@ -69,12 +68,8 @@ async function loadModeCards(
   try {
     cards = await processCards(lang, setDetail, effectiveMode);
   } catch {
-    // Fallback: use raw cards
     cards = setDetail.cards.slice(0, 9).map(c => ({
-      ...c,
-      reverse: false,
-      reverseType: undefined as any,
-      graded: false,
+      ...c, reverse: false, reverseType: undefined as any, graded: false,
     }));
   }
 
@@ -105,7 +100,6 @@ async function loadModeCards(
   return results;
 }
 
-/** Generate a mini PDF page preview (3x3 card grid) on an offscreen canvas */
 async function generatePagePreview(
   cardImages: (string | null)[]
 ): Promise<HTMLCanvasElement> {
@@ -135,16 +129,13 @@ async function generatePagePreview(
       try {
         const img = await loadImage(dataUrl);
         pctx.drawImage(img, x, y, cardW, cardH);
-      } catch {
-        // skip
-      }
+      } catch { /* skip */ }
     }
   }
 
   return page;
 }
 
-/** Draw a page preview with shadow and rotation */
 function drawPageOnCanvas(
   ctx: CanvasRenderingContext2D,
   page: HTMLCanvasElement,
@@ -155,25 +146,35 @@ function drawPageOnCanvas(
   ctx.translate(x + w / 2, y + h / 2);
   ctx.rotate((rotation * Math.PI) / 180);
 
-  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-  ctx.shadowBlur = 30;
-  ctx.shadowOffsetX = 5;
-  ctx.shadowOffsetY = 8;
+  // Deep shadow
+  ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+  ctx.shadowBlur = 40;
+  ctx.shadowOffsetX = 8;
+  ctx.shadowOffsetY = 12;
 
+  // White page background with rounded corners
+  const r = 8;
+  roundRect(ctx, -w / 2, -h / 2, w, h, r);
   ctx.fillStyle = "#fff";
-  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.fill();
   ctx.shadowColor = "transparent";
 
+  // Clip and draw content
+  ctx.save();
+  roundRect(ctx, -w / 2, -h / 2, w, h, r);
+  ctx.clip();
   ctx.drawImage(page, -w / 2, -h / 2, w, h);
+  ctx.restore();
 
-  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  // Border
+  ctx.strokeStyle = "rgba(0,0,0,0.12)";
   ctx.lineWidth = 1.5;
-  ctx.strokeRect(-w / 2, -h / 2, w, h);
+  roundRect(ctx, -w / 2, -h / 2, w, h, r);
+  ctx.stroke();
 
   ctx.restore();
 }
 
-/** Draw a badge pill label */
 function drawBadge(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -185,23 +186,28 @@ function drawBadge(
   ctx.translate(x, y);
   ctx.rotate((rotation * Math.PI) / 180);
 
-  ctx.font = "bold 22px Arial, sans-serif";
+  ctx.font = "bold 26px Arial, sans-serif";
   const textW = ctx.measureText(text).width;
-  const bw = textW + 36;
-  const bh = 38;
+  const bw = textW + 44;
+  const bh = 44;
 
-  ctx.shadowColor = "rgba(0,0,0,0.4)";
-  ctx.shadowBlur = 12;
-  ctx.shadowOffsetY = 3;
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 4;
 
-  roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 19);
+  roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 22);
   ctx.fillStyle = color;
   ctx.fill();
   ctx.shadowColor = "transparent";
 
-  ctx.strokeStyle = "rgba(255,255,255,0.6)";
+  // Inner highlight
+  roundRect(ctx, -bw / 2 + 1, -bh / 2 + 1, bw - 2, bh / 2 - 1, 22);
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
   ctx.lineWidth = 2;
-  roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 19);
+  roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 22);
   ctx.stroke();
 
   ctx.fillStyle = "#fff";
@@ -227,38 +233,42 @@ export async function generateEtsyVisual(
 
   onProgress?.(2);
 
-  // === Background gradient ===
+  // === BACKGROUND: rich radial gradient + spotlight ===
   const baseColor = bgColor || "#e91e8c";
   const grad = hexToGradient(baseColor);
-  const bgGrad = ctx.createRadialGradient(SIZE / 2, SIZE / 2, 100, SIZE / 2, SIZE / 2, SIZE * 0.75);
+
+  // Base gradient
+  const bgGrad = ctx.createRadialGradient(SIZE / 2, SIZE * 0.35, 50, SIZE / 2, SIZE / 2, SIZE * 0.85);
   bgGrad.addColorStop(0, grad.mid);
+  bgGrad.addColorStop(0.6, grad.end);
   bgGrad.addColorStop(1, grad.start);
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, SIZE, SIZE);
 
-  // Subtle grid overlay
+  // Spotlight glow at top-center
   ctx.save();
-  ctx.globalAlpha = 0.05;
-  for (let i = 0; i < SIZE; i += 40) {
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i, SIZE);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, i);
-    ctx.lineTo(SIZE, i);
-    ctx.stroke();
-  }
+  const spotlight = ctx.createRadialGradient(SIZE / 2, 120, 0, SIZE / 2, 120, 500);
+  spotlight.addColorStop(0, "rgba(255,255,255,0.12)");
+  spotlight.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = spotlight;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+  ctx.restore();
+
+  // Subtle vignette
+  ctx.save();
+  const vignette = ctx.createRadialGradient(SIZE / 2, SIZE / 2, SIZE * 0.3, SIZE / 2, SIZE / 2, SIZE * 0.75);
+  vignette.addColorStop(0, "rgba(0,0,0,0)");
+  vignette.addColorStop(1, "rgba(0,0,0,0.35)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, SIZE, SIZE);
   ctx.restore();
 
   onProgress?.(4);
 
-  // === Load mode-specific cards ===
+  // === Load cards for each mode ===
   const modes: ("complete" | "master" | "graded" | "grayscale")[] = ["complete", "master", "graded", "grayscale"];
   const modeCardImages: Record<string, (string | null)[]> = {};
-  
+
   for (let mi = 0; mi < modes.length; mi++) {
     const m = modes[mi];
     modeCardImages[m] = await loadModeCards(setDetail, lang, m, (loaded, total) => {
@@ -269,7 +279,7 @@ export async function generateEtsyVisual(
 
   onProgress?.(64);
 
-  // === Generate page previews per mode ===
+  // === Generate page previews ===
   const completePage = await generatePagePreview(modeCardImages["complete"]);
   const masterPage = await generatePagePreview(modeCardImages["master"]);
   const gradedPage = await generatePagePreview(modeCardImages["graded"]);
@@ -277,146 +287,141 @@ export async function generateEtsyVisual(
 
   onProgress?.(68);
 
-  // === Scattered layout — LARGE pages like reference images ===
-  const bigW = 340;
-  const bigH = 480;
-  const medW = 300;
-  const medH = 424;
+  // === LOGO (top, centered, large) ===
+  const logoUrl = customLogoUrl || setDetail.logo;
+  let logoImg: HTMLImageElement | null = null;
+  if (logoUrl) {
+    try { logoImg = await loadImage(logoUrl); } catch { /* skip */ }
+  }
 
-  // Draw order: back to front (furthest back first)
-  // Grayscale - right side, tall
-  drawPageOnCanvas(ctx, grayscalePage, 640, 200, medW, medH, 5);
-  drawBadge(ctx, "Grayscale", 790, 230, "#8b5cf6", 5);
+  const logoBottomY = (() => {
+    if (logoImg) {
+      const maxLogoW = 600;
+      const maxLogoH = 180;
+      const logoAspect = logoImg.width / logoImg.height;
+      let logoW = maxLogoW;
+      let logoH = logoW / logoAspect;
+      if (logoH > maxLogoH) { logoH = maxLogoH; logoW = logoH * logoAspect; }
 
-  // Master - top center
-  drawPageOnCanvas(ctx, masterPage, 350, 120, medW, medH, -2);
-  drawBadge(ctx, "Master Set", 500, 150, "#3b82f6", -2);
+      const logoX = SIZE / 2 - logoW / 2;
+      const logoY = 40;
 
-  // Complete - center-left, overlapping
-  drawPageOnCanvas(ctx, completePage, 140, 260, bigW, bigH, -6);
-  drawBadge(ctx, "Complete Set", 310, 290, "#f97316", -6);
+      // Glow behind logo
+      ctx.save();
+      ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+      ctx.shadowBlur = 50;
+      ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
+      ctx.restore();
+      // Crisp logo on top
+      ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
 
-  // Graded - bottom-left, largest & most prominent (front)
-  drawPageOnCanvas(ctx, gradedPage, -10, 420, bigW + 40, bigH + 56, -10);
-  drawBadge(ctx, "Graded Set", 180, 465, "#ef4444", -10);
+      return logoY + logoH;
+    } else {
+      // Fallback: set name
+      ctx.save();
+      ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+      ctx.shadowBlur = 30;
+      ctx.shadowOffsetY = 4;
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 72px Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(setDetail.name, SIZE / 2, 55);
+      ctx.restore();
+      return 55 + 80;
+    }
+  })();
 
-  onProgress?.(75);
+  onProgress?.(72);
 
-  // === "Download, Print, Cut" header (top-left, bold) ===
-  ctx.save();
-  ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-  ctx.shadowBlur = 12;
-  ctx.shadowOffsetY = 3;
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 48px Arial, sans-serif";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  ctx.fillText("Download, Print, Cut", 40, 35);
-  ctx.restore();
-
-  onProgress?.(78);
-
-  // === Language flags (below header, top-left) ===
-  const flagSize = 50;
-  const flagGap = 14;
-  let flagX = 45;
-  const flagY = 100;
+  // === FLAGS (centered, below logo) ===
+  const flagSize = 54;
+  const flagGap = 16;
+  const totalFlagsW = langs.length * flagSize + (langs.length - 1) * flagGap;
+  let flagX = SIZE / 2 - totalFlagsW / 2;
+  const flagY = logoBottomY + 20;
 
   for (const l of langs) {
     try {
       const flagImg = await loadImage(FLAG_URLS[l]);
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.3)";
-      ctx.shadowBlur = 8;
       const fh = flagSize * 0.67;
-      roundRect(ctx, flagX, flagY, flagSize, fh, 5);
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.4)";
+      ctx.shadowBlur = 10;
+      roundRect(ctx, flagX, flagY, flagSize, fh, 6);
       ctx.clip();
       ctx.drawImage(flagImg, flagX, flagY, flagSize, fh);
       ctx.restore();
+      // Border
       ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.strokeStyle = "rgba(255,255,255,0.6)";
       ctx.lineWidth = 2;
-      roundRect(ctx, flagX, flagY, flagSize, fh, 5);
+      roundRect(ctx, flagX, flagY, flagSize, fh, 6);
       ctx.stroke();
       ctx.restore();
-    } catch {
-      // skip
-    }
+    } catch { /* skip */ }
     flagX += flagSize + flagGap;
   }
 
-  onProgress?.(82);
+  onProgress?.(76);
 
-  // === Set logo (centered) ===
-  const logoUrl = customLogoUrl || setDetail.logo;
-  let logoImg: HTMLImageElement | null = null;
-  if (logoUrl) {
-    try {
-      logoImg = await loadImage(logoUrl);
-    } catch {
-      // skip
-    }
+  // === FAN LAYOUT: 4 pages in cascade left→right ===
+  const pageW = 280;
+  const pageH = 396;
+  const fanCenterX = SIZE / 2;
+  const fanBaseY = flagY + 70;
+  const spacing = 195; // horizontal spacing between pages
+  const rotations = [-12, -4, 4, 12];
+  const pages = [gradedPage, completePage, masterPage, grayscalePage];
+  const labels = ["Graded Set", "Complete Set", "Master Set", "Grayscale"];
+  const colors = ["#ef4444", "#f97316", "#3b82f6", "#8b5cf6"];
+
+  // Calculate positions: centered fan
+  const totalFanW = (pages.length - 1) * spacing;
+  const startX = fanCenterX - totalFanW / 2 - pageW / 2;
+
+  for (let i = 0; i < pages.length; i++) {
+    const px = startX + i * spacing;
+    const py = fanBaseY + Math.abs(rotations[i]) * 2; // slight vertical offset for outer pages
+
+    drawPageOnCanvas(ctx, pages[i], px, py, pageW, pageH, rotations[i]);
+
+    // Badge at bottom of each page
+    const badgeCx = px + pageW / 2;
+    const badgeCy = py + pageH - 10;
+    drawBadge(ctx, labels[i], badgeCx, badgeCy, colors[i], rotations[i]);
   }
 
-  if (logoImg) {
-    const maxLogoW = 550;
-    const maxLogoH = 220;
-    const logoAspect = logoImg.width / logoImg.height;
-    let logoW = maxLogoW;
-    let logoH = logoW / logoAspect;
-    if (logoH > maxLogoH) {
-      logoH = maxLogoH;
-      logoW = logoH * logoAspect;
-    }
+  onProgress?.(88);
 
-    const logoX = SIZE / 2 - logoW / 2;
-    const logoY = SIZE / 2 - logoH / 2 - 40;
-
-    // Strong glow
-    ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
-    ctx.shadowBlur = 40;
-    ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
-    ctx.restore();
-    ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
-  } else {
-    // Fallback: set name as large text
-    ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
-    ctx.shadowBlur = 25;
-    ctx.shadowOffsetY = 4;
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 64px Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(setDetail.name, SIZE / 2, SIZE / 2 - 40);
-    ctx.restore();
-  }
-
-  onProgress?.(90);
-
-  // === Bottom CTA: "✨ Download ✨" ===
+  // === BOTTOM BANNER ===
   ctx.save();
+  // Semi-transparent dark bar
+  const bannerH = 80;
+  const bannerY = SIZE - bannerH;
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.fillRect(0, bannerY, SIZE, bannerH);
+
+  // Top highlight line
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(0, bannerY, SIZE, 2);
+
+  // CTA text
   ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
   ctx.shadowBlur = 10;
-  ctx.shadowOffsetY = 3;
   ctx.fillStyle = "#fff";
-  ctx.font = "bold 52px Arial, sans-serif";
+  ctx.font = "bold 42px Arial, sans-serif";
   ctx.textAlign = "center";
-  ctx.textBaseline = "bottom";
-  ctx.fillText("✨ Download ✨", SIZE / 2, SIZE - 30);
+  ctx.textBaseline = "middle";
+  ctx.fillText("✨ Instant Digital Download ✨", SIZE / 2, bannerY + bannerH / 2);
   ctx.restore();
 
   onProgress?.(95);
 
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
-      if (blob) {
-        onProgress?.(100);
-        resolve(blob);
-      } else {
-        reject(new Error("Canvas toBlob failed"));
-      }
+      if (blob) { onProgress?.(100); resolve(blob); }
+      else reject(new Error("Canvas toBlob failed"));
     }, "image/png");
   });
 }

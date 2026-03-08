@@ -1,4 +1,5 @@
 import type { SetDetail, Lang } from "@/lib/tcgdex-api";
+import { fetchSeriesDetail } from "@/lib/tcgdex-api";
 
 const SIZE = 1080;
 

@@ -88,6 +88,12 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
     );
   };
 
+  const togglePdfLang = (l: Lang) => {
+    setSelectedPdfLangs((prev) =>
+      prev.includes(l) ? (prev.length > 1 ? prev.filter((x) => x !== l) : prev) : [...prev, l]
+    );
+  };
+
   const toggleVisualLang = (l: Lang) => {
     setSelectedVisualLangs((prev) =>
       prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]

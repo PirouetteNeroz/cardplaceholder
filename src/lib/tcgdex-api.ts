@@ -175,6 +175,69 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
   return filtered;
 }
 
+export async function fetchPokemonNames(lang: Lang): Promise<string[]> {
+  const res = await fetch(`${BASE_URL}/${lang}/cards`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const cards: { id: string; name: string }[] = await res.json();
+  // Filter out Pokémon Pocket cards and extract unique names
+  const names = new Set<string>();
+  for (const c of cards) {
+    if (!c.id.startsWith("tcgp-")) {
+      names.add(c.name);
+    }
+  }
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+export async function fetchCardsByPokemonName(lang: Lang, name: string): Promise<CardListItem[]> {
+  const res = await fetch(`${BASE_URL}/${lang}/cards?name=${encodeURIComponent(name)}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const cards: CardListItem[] = await res.json();
+  let filtered = cards.filter((c) => !c.id.startsWith("tcgp-"));
+
+  const setIds = [...new Set(filtered.map((c) => c.id.replace(/-[^-]+$/, "")))];
+  const setInfoMap: Record<string, { releaseDate: string; setName: string; serieName: string }> = {};
+  await Promise.all(
+    setIds.map(async (setId) => {
+      try {
+        const setDetail = await fetchSetDetail(lang, setId);
+        setInfoMap[setId] = {
+          releaseDate: (setDetail as any).releaseDate || "9999-12-31",
+          setName: setDetail.name,
+          serieName: setDetail.serie.name,
+        };
+      } catch {
+        setInfoMap[setId] = { releaseDate: "9999-12-31", setName: setId, serieName: "" };
+      }
+    })
+  );
+
+  for (const card of filtered) {
+    const setId = card.id.replace(/-[^-]+$/, "");
+    const info = setInfoMap[setId];
+    if (info) {
+      card.setName = info.setName;
+      card.serieName = info.serieName;
+      card.releaseDate = info.releaseDate;
+    }
+  }
+
+  const EXCLUDED_SERIES = ["jeu de cartes à collectionner", "trading card game", "sammelkartenspiel"];
+  filtered = filtered.filter((c) => {
+    const sn = (c.serieName || "").toLowerCase();
+    return !EXCLUDED_SERIES.some((ex) => sn.includes(ex));
+  });
+
+  filtered.sort((a, b) => {
+    const dateA = a.releaseDate || "9999-12-31";
+    const dateB = b.releaseDate || "9999-12-31";
+    if (dateA !== dateB) return dateA.localeCompare(dateB);
+    return a.id.localeCompare(b.id);
+  });
+
+  return filtered;
+}
+
 export function getCardImageUrl(lang: Lang, serieId: string, setId: string, localId: string): string {
   return `https://assets.tcgdex.net/${lang}/${serieId}/${setId}/${localId}/high.png`;
 }

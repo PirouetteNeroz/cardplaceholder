@@ -15,13 +15,14 @@ interface GeneratedFile {
 }
 
 interface Props {
-  illustratorName: string | null;
+  entityName: string | null;
+  entityLabel?: string;
   cards: CardListItem[];
   lang: Lang;
   disabled?: boolean;
 }
 
-export function IllustratorEtsyDialog({ illustratorName, cards, lang, disabled }: Props) {
+export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur", cards, lang, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [colorModes, setColorModes] = useState<("color" | "grayscale")[]>(["color"]);
   const [generating, setGenerating] = useState(false);

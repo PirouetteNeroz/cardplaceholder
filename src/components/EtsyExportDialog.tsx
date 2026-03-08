@@ -175,10 +175,10 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
               (pct) => setPngProgress(((jobDone + pct / 100) / totalJobs) * 100)
             );
             if (blob) {
-              const langSuffix = pngLangs.length > 1 ? `_${pngLang}` : "";
               const colorSuffix = isGray ? "_nb" : "";
+              const modeLabel = mode === "complete" ? "complete-set" : mode === "master" ? "master-set" : mode === "graded" ? "graded-set" : "special-set";
               pngFiles.push({
-                name: `${langSet.name}${langSuffix}_${mode}${colorSuffix}_page${pageIdx + 1}.png`,
+                name: `${pngLang.toUpperCase()}_${langSet.name}_${modeLabel}${colorSuffix}_page${pageIdx + 1}.png`,
                 mode,
                 blob,
                 type: "image",

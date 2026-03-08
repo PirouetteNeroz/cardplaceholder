@@ -3,18 +3,29 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { ShoppingBag, Download, Loader2, CheckCircle2, Palette } from "lucide-react";
+import { ShoppingBag, Download, Loader2, CheckCircle2, Palette, Image as ImageIcon } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { ExportMode, SetDetail, Lang } from "@/lib/tcgdex-api";
 import { processCards } from "@/lib/tcgdex-api";
 import { toast } from "sonner";
 import { loadCardWithOverlays } from "@/lib/pdf-utils";
+import { generateEtsyVisual } from "@/lib/etsy-visual-generator";
 
 const MODES: { value: ExportMode; label: string; description: string }[] = [
   { value: "complete", label: "Complete Set", description: "Toutes les cartes du set" },
   { value: "master", label: "Master Set", description: "Avec reverses pour les cartes éligibles" },
   { value: "graded", label: "Graded", description: "Exclut Common et Uncommon" },
   { value: "special", label: "Master Set Spécial", description: "4x reverse (normal, Poké Ball, Master Ball)" },
+];
+
+const AVAILABLE_LANGS: { value: Lang; label: string }[] = [
+  { value: "fr", label: "🇫🇷 FR" },
+  { value: "en", label: "🇬🇧 EN" },
+  { value: "de", label: "🇩🇪 DE" },
+  { value: "es", label: "🇪🇸 ES" },
+  { value: "it", label: "🇮🇹 IT" },
+  { value: "pt", label: "🇵🇹 PT" },
+  { value: "ja", label: "🇯🇵 JA" },
 ];
 
 interface GeneratedFile {
@@ -39,6 +50,12 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
 
+  // Visual generator state
+  const [generatingVisual, setGeneratingVisual] = useState(false);
+  const [visualProgress, setVisualProgress] = useState(0);
+  const [selectedVisualLangs, setSelectedVisualLangs] = useState<Lang[]>([lang]);
+  const [visualPreview, setVisualPreview] = useState<string | null>(null);
+
   const toggleMode = (mode: ExportMode) => {
     setSelectedModes((prev) =>
       prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode]
@@ -49,6 +66,40 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
     setColorModes((prev) =>
       prev.includes(cm) ? prev.filter((c) => c !== cm) : [...prev, cm]
     );
+  };
+
+  const toggleVisualLang = (l: Lang) => {
+    setSelectedVisualLangs((prev) =>
+      prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]
+    );
+  };
+
+  const handleGenerateVisual = async () => {
+    if (!setDetail) return;
+    setGeneratingVisual(true);
+    setVisualProgress(0);
+    try {
+      const blob = await generateEtsyVisual(
+        setDetail,
+        lang,
+        selectedVisualLangs.length > 0 ? selectedVisualLangs : [lang],
+        (pct) => setVisualProgress(pct)
+      );
+      const url = URL.createObjectURL(blob);
+      setVisualPreview(url);
+
+      // Auto-download
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${setDetail.name}_etsy_visual.png`;
+      a.click();
+
+      toast.success("Visuel Etsy généré !");
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur lors de la génération du visuel");
+    }
+    setGeneratingVisual(false);
   };
 
   const handleGenerate = async () => {
@@ -77,7 +128,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
         const { jsPDF } = await import("jspdf");
 
         const cardsPerPage = 9;
-        const maxPagesPerPDF = 6;
+        const maxPagesPerPDF = 15;
         const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF;
         const totalParts = Math.ceil(cards.length / maxCardsPerPDF);
 
@@ -182,14 +233,14 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!generating) setOpen(v); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!generating && !generatingVisual) setOpen(v); }}>
       <DialogTrigger asChild>
         <Button variant="outline" disabled={disabled}>
           <ShoppingBag className="mr-2 h-4 w-4" />
           Etsy Export
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display flex items-center gap-2">
             <ShoppingBag className="h-5 w-5 text-primary" />
@@ -199,47 +250,104 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
 
         {!generating && generatedFiles.length === 0 && (
           <div className="space-y-4 py-2">
-            <p className="text-sm text-muted-foreground">
-              Sélectionnez les modes d'export à générer :
-            </p>
-            <div className="space-y-3">
-              {MODES.map((m) => (
-                <div key={m.value} className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                  <Checkbox
-                    id={m.value}
-                    checked={selectedModes.includes(m.value)}
-                    onCheckedChange={() => toggleMode(m.value)}
-                  />
-                  <div className="space-y-0.5">
-                    <Label htmlFor={m.value} className="font-medium cursor-pointer">
-                      {m.label}
-                    </Label>
-                    <p className="text-xs text-muted-foreground">{m.description}</p>
-                  </div>
+            {/* === Visual Generator Section === */}
+            <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-primary" />
+                Visuel promotionnel (1080×1080)
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Génère automatiquement une image pour votre annonce Etsy avec aperçu des cartes, badges des modes et drapeaux.
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                {AVAILABLE_LANGS.map((l) => (
+                  <button
+                    key={l.value}
+                    onClick={() => toggleVisualLang(l.value)}
+                    className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                      selectedVisualLangs.includes(l.value)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+
+              {generatingVisual && (
+                <div className="space-y-2">
+                  <Progress value={visualProgress} className="h-2" />
+                  <p className="text-xs text-muted-foreground text-center">Génération du visuel...</p>
                 </div>
-              ))}
+              )}
+
+              {visualPreview && !generatingVisual && (
+                <div className="rounded-lg overflow-hidden border">
+                  <img src={visualPreview} alt="Aperçu visuel Etsy" className="w-full" />
+                </div>
+              )}
+
+              <Button
+                size="sm"
+                onClick={handleGenerateVisual}
+                disabled={generatingVisual || !setDetail}
+                className="w-full"
+              >
+                {generatingVisual ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                )}
+                Générer le visuel Etsy
+              </Button>
             </div>
 
-            <div className="border-t pt-3">
-              <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
-                <Palette className="h-4 w-4" /> Format de couleur :
+            {/* === PDF Export Section === */}
+            <div className="border-t pt-4">
+              <p className="text-sm text-muted-foreground mb-3">
+                Sélectionnez les modes d'export PDF :
               </p>
-              <div className="flex gap-3">
-                <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors flex-1">
-                  <Checkbox
-                    id="color-mode"
-                    checked={colorModes.includes("color")}
-                    onCheckedChange={() => toggleColorMode("color")}
-                  />
-                  <Label htmlFor="color-mode" className="font-medium cursor-pointer">Couleur</Label>
-                </div>
-                <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors flex-1">
-                  <Checkbox
-                    id="grayscale-mode"
-                    checked={colorModes.includes("grayscale")}
-                    onCheckedChange={() => toggleColorMode("grayscale")}
-                  />
-                  <Label htmlFor="grayscale-mode" className="font-medium cursor-pointer">Nuances de gris</Label>
+              <div className="space-y-3">
+                {MODES.map((m) => (
+                  <div key={m.value} className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                    <Checkbox
+                      id={m.value}
+                      checked={selectedModes.includes(m.value)}
+                      onCheckedChange={() => toggleMode(m.value)}
+                    />
+                    <div className="space-y-0.5">
+                      <Label htmlFor={m.value} className="font-medium cursor-pointer">
+                        {m.label}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">{m.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t pt-3 mt-3">
+                <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                  <Palette className="h-4 w-4" /> Format de couleur :
+                </p>
+                <div className="flex gap-3">
+                  <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors flex-1">
+                    <Checkbox
+                      id="color-mode"
+                      checked={colorModes.includes("color")}
+                      onCheckedChange={() => toggleColorMode("color")}
+                    />
+                    <Label htmlFor="color-mode" className="font-medium cursor-pointer">Couleur</Label>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors flex-1">
+                    <Checkbox
+                      id="grayscale-mode"
+                      checked={colorModes.includes("grayscale")}
+                      onCheckedChange={() => toggleColorMode("grayscale")}
+                    />
+                    <Label htmlFor="grayscale-mode" className="font-medium cursor-pointer">Nuances de gris</Label>
+                  </div>
                 </div>
               </div>
             </div>

@@ -16,8 +16,9 @@ import {
 } from "@/lib/tcgdex-api";
 import { PdfProgressDialog } from "@/components/PdfProgressDialog";
 import { EtsyExportDialog } from "@/components/EtsyExportDialog";
-import { Loader2, Download, BookOpen, Layers } from "lucide-react";
+import { Loader2, Download, BookOpen, Layers, Paintbrush } from "lucide-react";
 import { toast } from "sonner";
+import { NavLink } from "@/components/NavLink";
 import { loadCardWithOverlays } from "@/lib/pdf-utils";
 
 const LANGS: { value: Lang; label: string }[] = [
@@ -216,6 +217,9 @@ const Index = () => {
             <h1 className="text-xl font-display font-bold text-foreground">TCGdex Explorer</h1>
           </div>
           <div className="flex flex-wrap items-center gap-3 ml-auto">
+            <NavLink to="/illustrators" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+              <Paintbrush className="h-4 w-4" /> Illustrateurs
+            </NavLink>
             <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue />

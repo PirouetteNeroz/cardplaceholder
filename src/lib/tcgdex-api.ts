@@ -103,6 +103,25 @@ export async function fetchCardDetail(lang: Lang, cardId: string): Promise<CardI
   return res.json();
 }
 
+export async function fetchIllustrators(lang: Lang): Promise<string[]> {
+  const res = await fetch(`${BASE_URL}/${lang}/illustrators`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export interface CardListItem {
+  id: string;
+  localId: string;
+  name: string;
+  image?: string;
+}
+
+export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): Promise<CardListItem[]> {
+  const res = await fetch(`${BASE_URL}/${lang}/cards?illustrator=${encodeURIComponent(illustrator)}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 export function getCardImageUrl(lang: Lang, serieId: string, setId: string, localId: string): string {
   return `https://assets.tcgdex.net/${lang}/${serieId}/${setId}/${localId}/high.png`;
 }

@@ -175,25 +175,62 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
   return filtered;
 }
 
+// Suffixes to strip for base Pokemon name extraction
+const POKEMON_SUFFIXES = [
+  " ex", " EX", " Ex",
+  " gx", " GX", " Gx",
+  " vmax", " VMAX", " Vmax",
+  " vstar", " VSTAR", " Vstar",
+  " v", " V",
+  " δ", " ◇", " ☆",
+  "-ex", "-EX", "-gx", "-GX", "-V", "-VMAX", "-VSTAR",
+  " Lv.X", " LV.X",
+  " TURBO", " Turbo",
+  " BREAK", " Break",
+  " Radieux", " Radiant",
+  " de Hisui", " d'Alola", " de Galar", " de Paldea",
+  " Hisuian", " Alolan", " Galarian", " Paldean",
+];
+
+function extractBasePokemonName(name: string): string {
+  let base = name.trim();
+  // Remove common suffixes
+  for (const suffix of POKEMON_SUFFIXES) {
+    if (base.endsWith(suffix)) {
+      base = base.slice(0, -suffix.length).trim();
+    }
+  }
+  // Remove trailing special characters and numbers like "♀", "♂", numbers
+  base = base.replace(/[\s]*(♀|♂)$/, "").trim();
+  return base;
+}
+
 export async function fetchPokemonNames(lang: Lang): Promise<string[]> {
   const res = await fetch(`${BASE_URL}/${lang}/cards`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const cards: { id: string; name: string }[] = await res.json();
-  // Filter out Pokémon Pocket cards and extract unique names
+  // Filter out Pokémon Pocket cards and extract unique BASE names
   const names = new Set<string>();
   for (const c of cards) {
     if (!c.id.startsWith("tcgp-")) {
-      names.add(c.name);
+      names.add(extractBasePokemonName(c.name));
     }
   }
   return [...names].sort((a, b) => a.localeCompare(b));
 }
 
-export async function fetchCardsByPokemonName(lang: Lang, name: string): Promise<CardListItem[]> {
-  const res = await fetch(`${BASE_URL}/${lang}/cards?name=${encodeURIComponent(name)}`);
+export async function fetchCardsByPokemonName(lang: Lang, baseName: string): Promise<CardListItem[]> {
+  // Fetch all cards and filter by base name match
+  const res = await fetch(`${BASE_URL}/${lang}/cards`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const cards: CardListItem[] = await res.json();
-  let filtered = cards.filter((c) => !c.id.startsWith("tcgp-"));
+  const allCards: CardListItem[] = await res.json();
+  
+  // Filter cards whose base name matches the requested base name
+  let filtered = allCards.filter((c) => {
+    if (c.id.startsWith("tcgp-")) return false;
+    const cardBaseName = extractBasePokemonName(c.name);
+    return cardBaseName.toLowerCase() === baseName.toLowerCase();
+  });
 
   const setIds = [...new Set(filtered.map((c) => c.id.replace(/-[^-]+$/, "")))];
   const setInfoMap: Record<string, { releaseDate: string; setName: string; serieName: string }> = {};

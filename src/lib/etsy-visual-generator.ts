@@ -395,13 +395,17 @@ export async function generateEtsyVisual(
   const totalFanW = (pages.length - 1) * spacing;
   const startX = fanCenterX - totalFanW / 2 - pageW / 2;
 
+  // First pass: draw all pages (back to front)
   for (let i = 0; i < pages.length; i++) {
     const px = startX + i * spacing;
-    const py = fanBaseY + i * verticalStep; // staggered: each page lower
-
+    const py = fanBaseY + i * verticalStep;
     drawPageOnCanvas(ctx, pages[i], px, py, pageW, pageH, rotations[i]);
+  }
 
-    // Badge at bottom of each page
+  // Second pass: draw all badges ON TOP of all pages
+  for (let i = 0; i < pages.length; i++) {
+    const px = startX + i * spacing;
+    const py = fanBaseY + i * verticalStep;
     const badgeCx = px + pageW / 2;
     const badgeCy = py + pageH - 10;
     drawBadge(ctx, labels[i], badgeCx, badgeCy, colors[i], rotations[i]);

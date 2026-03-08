@@ -240,20 +240,13 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
               setProgress(30 + globalProgress * 70);
             }
 
+            const langSuffix = selectedPdfLangs.length > 1 ? `_${pdfLang}` : "";
             const colorSuffix = isGrayscale ? "_nb" : "";
             const suffix = totalParts > 1 ? `_part${part + 1}` : "";
             const pdfBlob = doc.output("blob");
             
-            // Generate page previews from PDF
-            const previewUrls: string[] = [];
-            const totalPages = doc.getNumberOfPages();
-            for (let p = 1; p <= Math.min(totalPages, 5); p++) {
-              doc.setPage(p);
-              // We'll use a simple canvas approach for preview
-            }
-            
             files.push({
-              name: `${setDetail.name}_${mode}${colorSuffix}${suffix}.pdf`,
+              name: `${langSetDetail.name}${langSuffix}_${mode}${colorSuffix}${suffix}.pdf`,
               mode,
               blob: pdfBlob,
               type: "pdf",

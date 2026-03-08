@@ -145,14 +145,16 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
             setProgress(30 + globalProgress * 70);
           }
 
+          const colorSuffix = isGrayscale ? "_nb" : "";
           const suffix = totalParts > 1 ? `_part${part + 1}` : "";
           const pdfBlob = doc.output("blob");
           files.push({
-            name: `${setDetail.name}_${mode}${suffix}.pdf`,
+            name: `${setDetail.name}_${mode}${colorSuffix}${suffix}.pdf`,
             mode,
             blob: pdfBlob,
           });
         }
+      }
       } catch (e) {
         console.error(e);
         toast.error(`Erreur pour le mode ${mode}`);

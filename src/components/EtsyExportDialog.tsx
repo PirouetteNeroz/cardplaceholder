@@ -341,13 +341,13 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
               setProgress(30 + globalProgress * 70);
             }
 
-            const langSuffix = selectedPdfLangs.length > 1 ? `_${pdfLang}` : "";
             const colorSuffix = isGrayscale ? "_nb" : "";
             const suffix = totalParts > 1 ? `_part${part + 1}` : "";
             const pdfBlob = doc.output("blob");
+            const modeLabel = mode === "complete" ? "complete-set" : mode === "master" ? "master-set" : mode === "graded" ? "graded-set" : "special-set";
             
             files.push({
-              name: `${langSetDetail.name}${langSuffix}_${mode}${colorSuffix}${suffix}.pdf`,
+              name: `${pdfLang.toUpperCase()}_${langSetDetail.name}_${modeLabel}${colorSuffix}${suffix}.pdf`,
               mode,
               blob: pdfBlob,
               type: "pdf",

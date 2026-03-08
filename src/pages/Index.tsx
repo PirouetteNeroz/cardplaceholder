@@ -198,7 +198,7 @@ const Index = () => {
       console.error(e);
     }
     setTimeout(() => setPdfGenerating(false), 800);
-  }, [setDetail, processedCards, lang, mode]);
+  }, [setDetail, processedCards, lang, mode, maxPagesPerPDF]);
 
   // Derive table data
   const reverseCards = processedCards.filter(c => c.reverse && !c.reverseType);

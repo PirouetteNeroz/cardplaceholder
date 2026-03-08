@@ -247,52 +247,18 @@ export async function generateEtsyVisual(
 
   onProgress?.(2);
 
-  // === BACKGROUND: rich multi-layer gradient ===
-  const baseColor = bgColor || "#e91e8c";
-  const grad = hexToGradient(baseColor);
-
-  // Base dark gradient
-  const bgGrad = ctx.createRadialGradient(SIZE / 2, SIZE * 0.3, 0, SIZE / 2, SIZE / 2, SIZE * 0.9);
-  bgGrad.addColorStop(0, grad.mid);
-  bgGrad.addColorStop(0.5, grad.end);
-  bgGrad.addColorStop(1, grad.start);
-  ctx.fillStyle = bgGrad;
+  // === BACKGROUND: solid color fill ===
+  const baseColor = bgColor || "#f0c040";
+  ctx.fillStyle = baseColor;
   ctx.fillRect(0, 0, SIZE, SIZE);
 
-  // Large warm spotlight behind pages area
-  ctx.save();
-  const spotlight = ctx.createRadialGradient(SIZE / 2, SIZE * 0.55, 0, SIZE / 2, SIZE * 0.55, SIZE * 0.6);
-  spotlight.addColorStop(0, "rgba(255,255,255,0.10)");
-  spotlight.addColorStop(0.5, "rgba(255,255,255,0.04)");
+  // Subtle radial lighter center
+  const grad = hexToGradient(baseColor);
+  const spotlight = ctx.createRadialGradient(SIZE / 2, SIZE / 2, 0, SIZE / 2, SIZE / 2, SIZE * 0.7);
+  spotlight.addColorStop(0, "rgba(255,255,255,0.15)");
   spotlight.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = spotlight;
   ctx.fillRect(0, 0, SIZE, SIZE);
-  ctx.restore();
-
-  // Subtle bokeh-like circles for depth
-  ctx.save();
-  ctx.globalAlpha = 0.04;
-  for (let i = 0; i < 8; i++) {
-    const bx = 100 + Math.sin(i * 1.7) * 400;
-    const by = 200 + Math.cos(i * 2.3) * 350;
-    const br = 80 + (i % 3) * 60;
-    const bokeh = ctx.createRadialGradient(bx, by, 0, bx, by, br);
-    bokeh.addColorStop(0, "#fff");
-    bokeh.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = bokeh;
-    ctx.fillRect(0, 0, SIZE, SIZE);
-  }
-  ctx.globalAlpha = 1;
-  ctx.restore();
-
-  // Deep vignette for drama
-  ctx.save();
-  const vignette = ctx.createRadialGradient(SIZE / 2, SIZE / 2, SIZE * 0.25, SIZE / 2, SIZE / 2, SIZE * 0.72);
-  vignette.addColorStop(0, "rgba(0,0,0,0)");
-  vignette.addColorStop(1, "rgba(0,0,0,0.45)");
-  ctx.fillStyle = vignette;
-  ctx.fillRect(0, 0, SIZE, SIZE);
-  ctx.restore();
 
   onProgress?.(4);
 
@@ -318,25 +284,34 @@ export async function generateEtsyVisual(
 
   onProgress?.(68);
 
-  // === FLAGS (top-left corner) ===
-  const flagSize = 44;
-  const flagGap = 10;
-  let flagX = 28;
-  const flagY = 28;
+  // === "Download, Print, Cut" text top-left ===
+  ctx.save();
+  ctx.fillStyle = "#000";
+  ctx.font = "bold 52px Arial, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText("Download, Print, Cut", 30, 28);
+  ctx.restore();
+
+  // === FLAGS (top-left, below title) ===
+  const flagSize = 52;
+  const flagGap = 12;
+  let flagX = 30;
+  const flagY = 90;
 
   for (const l of langs) {
     try {
       const flagImg = await loadImage(FLAG_URLS[l]);
       const fh = flagSize * 0.67;
       ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.5)";
-      ctx.shadowBlur = 8;
+      ctx.shadowColor = "rgba(0,0,0,0.3)";
+      ctx.shadowBlur = 6;
       roundRect(ctx, flagX, flagY, flagSize, fh, 5);
       ctx.clip();
       ctx.drawImage(flagImg, flagX, flagY, flagSize, fh);
       ctx.restore();
       ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,0.7)";
+      ctx.strokeStyle = "rgba(0,0,0,0.2)";
       ctx.lineWidth = 1.5;
       roundRect(ctx, flagX, flagY, flagSize, fh, 5);
       ctx.stroke();
@@ -347,118 +322,90 @@ export async function generateEtsyVisual(
 
   onProgress?.(72);
 
-  // === LOGO (centered, VERY LARGE) ===
+  // === DIAGONAL CASCADE: bottom-left to top-right ===
+  // Order: Graded (bottom-left), Complete, Master, Grayscale (top-right)
+  const pages = [gradedPage, completePage, masterPage, grayscalePage];
+  const labels = ["Graded Set", "Complete Set", "Master Set", "Grayscale"];
+  const colors = ["#ef4444", "#f97316", "#3b82f6", "#8b5cf6"];
+
+  // Each page: positioned diagonally
+  const pageConfigs = [
+    { w: 420, h: 594, x: -30, y: 440, rot: -3 },   // Graded - bottom-left, largest
+    { w: 370, h: 522, x: 180, y: 280, rot: -1.5 },  // Complete
+    { w: 340, h: 480, x: 420, y: 160, rot: 1 },      // Master
+    { w: 340, h: 480, x: 660, y: 80, rot: 2.5 },     // Grayscale - top-right
+  ];
+
+  // Draw pages back to front (rightmost first so left overlaps)
+  for (let i = pages.length - 1; i >= 0; i--) {
+    const c = pageConfigs[i];
+    drawPageOnCanvas(ctx, pages[i], c.x, c.y, c.w, c.h, c.rot);
+  }
+
+  // Draw badges ON TOP of all pages
+  for (let i = 0; i < pages.length; i++) {
+    const c = pageConfigs[i];
+    // Badge at top-center of each page
+    const badgeCx = c.x + c.w / 2;
+    const badgeCy = c.y + 30;
+    drawBadge(ctx, labels[i], badgeCx, badgeCy, colors[i], c.rot);
+  }
+
+  onProgress?.(80);
+
+  // === LOGO (centered, ON TOP of pages, large) ===
   const logoUrl = customLogoUrl && customLogoUrl.trim() !== "" ? customLogoUrl.trim() : setDetail.logo;
   let logoImg: HTMLImageElement | null = null;
   if (logoUrl) {
     try { logoImg = await loadImage(logoUrl); } catch (e) { console.warn("Logo load failed:", logoUrl, e); }
   }
 
-  const logoBottomY = (() => {
-    if (logoImg) {
-      const maxLogoW = 780;
-      const maxLogoH = 260;
-      const logoAspect = logoImg.width / logoImg.height;
-      let logoW = maxLogoW;
-      let logoH = logoW / logoAspect;
-      if (logoH > maxLogoH) { logoH = maxLogoH; logoW = logoH * logoAspect; }
+  if (logoImg) {
+    const maxLogoW = 650;
+    const maxLogoH = 250;
+    const logoAspect = logoImg.width / logoImg.height;
+    let logoW = maxLogoW;
+    let logoH = logoW / logoAspect;
+    if (logoH > maxLogoH) { logoH = maxLogoH; logoW = logoH * logoAspect; }
 
-      const logoX = SIZE / 2 - logoW / 2;
-      const logoY = 65;
+    const logoX = SIZE / 2 - logoW / 2;
+    const logoY = SIZE / 2 - logoH / 2 + 60;
 
-      // Multi-layer glow
-      ctx.save();
-      ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
-      ctx.shadowBlur = 60;
-      ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
-      ctx.restore();
-      ctx.save();
-      ctx.shadowColor = grad.mid;
-      ctx.shadowBlur = 80;
-      ctx.globalAlpha = 0.3;
-      ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
-      ctx.globalAlpha = 1;
-      ctx.restore();
-      // Crisp logo
-      ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
-
-      return logoY + logoH;
-    } else {
-      ctx.save();
-      ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
-      ctx.shadowBlur = 40;
-      ctx.shadowOffsetY = 6;
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 86px Arial, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.fillText(setDetail.name, SIZE / 2, 50);
-      ctx.restore();
-      return 50 + 100;
-    }
-  })();
-
-  onProgress?.(76);
-
-  // === STAGGERED CASCADE: 4 tall pages, nearly straight ===
-  const pageW = 310;
-  const pageH = 560;
-  const fanCenterX = SIZE / 2;
-  const fanBaseY = logoBottomY + 5;
-  const spacing = 180;
-  const verticalStep = 22;
-  const rotations = [-1.5, -0.5, 0.5, 1.5];
-  const pages = [gradedPage, completePage, masterPage, grayscalePage];
-  const labels = ["Graded Set", "Complete Set", "Master Set", "Grayscale"];
-  const colors = ["#ef4444", "#f97316", "#3b82f6", "#8b5cf6"];
-
-  const totalFanW = (pages.length - 1) * spacing;
-  const startX = fanCenterX - totalFanW / 2 - pageW / 2;
-
-  // Draw all pages back to front
-  for (let i = 0; i < pages.length; i++) {
-    const px = startX + i * spacing;
-    const py = fanBaseY + i * verticalStep;
-    drawPageOnCanvas(ctx, pages[i], px, py, pageW, pageH, rotations[i]);
-  }
-
-  // Draw all badges ON TOP
-  for (let i = 0; i < pages.length; i++) {
-    const px = startX + i * spacing;
-    const py = fanBaseY + i * verticalStep;
-    const badgeCx = px + pageW / 2;
-    const badgeCy = py + pageH - 15;
-    drawBadge(ctx, labels[i], badgeCx, badgeCy, colors[i], rotations[i]);
+    // Strong shadow behind logo for readability
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+    ctx.shadowBlur = 40;
+    ctx.shadowOffsetY = 8;
+    ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
+    ctx.restore();
+    // Crisp logo on top
+    ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
+  } else {
+    // Fallback: set name centered
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 80px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(setDetail.name, SIZE / 2, SIZE / 2 + 40);
+    ctx.restore();
   }
 
   onProgress?.(88);
 
-  // === PREMIUM BOTTOM BANNER (raised) ===
+  // === BOTTOM CTA: "✨ Download ✨" ===
   ctx.save();
-  const bannerH = 80;
-  const bannerY = SIZE - bannerH - 15;
-
-  const bannerGrad = ctx.createLinearGradient(0, bannerY - 15, 0, SIZE);
-  bannerGrad.addColorStop(0, "rgba(0,0,0,0.0)");
-  bannerGrad.addColorStop(0.3, "rgba(0,0,0,0.5)");
-  bannerGrad.addColorStop(1, "rgba(0,0,0,0.7)");
-  ctx.fillStyle = bannerGrad;
-  ctx.fillRect(0, bannerY - 15, SIZE, bannerH + 30);
-
-  // CTA text with glow
-  ctx.shadowColor = "rgba(255,255,255,0.3)";
-  ctx.shadowBlur = 20;
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 44px Arial, sans-serif";
+  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 4;
+  ctx.fillStyle = "#000";
+  ctx.font = "bold 64px Arial, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("✨ Instant Digital Download ✨", SIZE / 2, bannerY + bannerH / 2 - 2);
-
-  // Subtle subtext
-  ctx.shadowColor = "transparent";
-  ctx.font = "20px Arial, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.fillText("Placeholders + Checklist  •  Color & Grayscale", SIZE / 2, bannerY + bannerH / 2 + 32);
+  ctx.fillText("✨ Download ✨", SIZE / 2, SIZE - 60);
   ctx.restore();
 
   onProgress?.(95);

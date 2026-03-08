@@ -105,6 +105,7 @@ const Pokemon = () => {
               cards={cards}
               lang={lang}
               disabled={cards.length === 0}
+              fetchCardsForLang={selectedPokemon ? (l) => fetchCardsByPokemonName(l, selectedPokemon) : undefined}
             />
           </div>
         </div>

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ShoppingBag, Download, Loader2, CheckCircle2, Palette, Image as ImageIcon, Archive, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { ExportMode, SetDetail, Lang } from "@/lib/tcgdex-api";
-import { processCards } from "@/lib/tcgdex-api";
+import { processCards, fetchSetDetail } from "@/lib/tcgdex-api";
 import { toast } from "sonner";
 import { loadCardWithOverlays } from "@/lib/pdf-utils";
 import { generateEtsyVisual } from "@/lib/etsy-visual-generator";
@@ -58,6 +58,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [selectedModes, setSelectedModes] = useState<ExportMode[]>([]);
   const [colorModes, setColorModes] = useState<("color" | "grayscale")[]>(["color"]);
+  const [selectedPdfLangs, setSelectedPdfLangs] = useState<Lang[]>([lang]);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState("");
@@ -84,6 +85,12 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   const toggleColorMode = (cm: "color" | "grayscale") => {
     setColorModes((prev) =>
       prev.includes(cm) ? prev.filter((c) => c !== cm) : [...prev, cm]
+    );
+  };
+
+  const togglePdfLang = (l: Lang) => {
+    setSelectedPdfLangs((prev) =>
+      prev.includes(l) ? (prev.length > 1 ? prev.filter((x) => x !== l) : prev) : [...prev, l]
     );
   };
 
@@ -122,28 +129,39 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   };
 
   const handleGenerate = async () => {
-    if (!setDetail || selectedModes.length === 0 || colorModes.length === 0) return;
+    if (!setDetail || selectedModes.length === 0 || colorModes.length === 0 || selectedPdfLangs.length === 0) return;
     setGenerating(true);
     setGeneratedFiles([]);
     const files: GeneratedFile[] = [];
-    const totalJobs = selectedModes.length * colorModes.length;
+    const totalJobs = selectedModes.length * colorModes.length * selectedPdfLangs.length;
     let jobIndex = 0;
 
-    for (const mode of selectedModes) {
-      for (const colorMode of colorModes) {
-        jobIndex++;
-        const isGrayscale = colorMode === "grayscale";
-        const colorLabel = isGrayscale ? "N&B" : "Couleur";
-        setCurrentFileIndex(jobIndex);
-        setCurrentStep(`Traitement (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
-        setProgress(0);
+    for (const pdfLang of selectedPdfLangs) {
+      // Fetch set detail for this language
+      let langSetDetail: SetDetail;
+      try {
+        langSetDetail = await fetchSetDetail(pdfLang, setDetail.id);
+      } catch {
+        toast.error(`Impossible de charger le set en ${pdfLang.toUpperCase()}`);
+        continue;
+      }
 
-        try {
-          const cards = await processCards(lang, setDetail, mode, (pct) => {
-            setProgress(pct * 0.3);
-          });
+      for (const mode of selectedModes) {
+        for (const colorMode of colorModes) {
+          jobIndex++;
+          const isGrayscale = colorMode === "grayscale";
+          const colorLabel = isGrayscale ? "N&B" : "Couleur";
+          const langLabel = pdfLang.toUpperCase();
+          setCurrentFileIndex(jobIndex);
+          setCurrentStep(`${langLabel} — ${MODES.find(m => m.value === mode)?.label} — ${colorLabel}...`);
+          setProgress(0);
 
-          setCurrentStep(`Génération du PDF (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
+          try {
+            const cards = await processCards(pdfLang, langSetDetail, mode, (pct) => {
+              setProgress(pct * 0.3);
+            });
+
+          setCurrentStep(`${langLabel} — Génération PDF (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
           const { jsPDF } = await import("jspdf");
 
           const cardsPerPage = 9;
@@ -162,15 +180,15 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
             // Cover page
             doc.setFontSize(32);
             doc.setFont("helvetica", "bold");
-            doc.text(setDetail.name, 105, 60, { align: "center" });
+            doc.text(langSetDetail.name, 105, 60, { align: "center" });
             doc.setFontSize(18);
             doc.setFont("helvetica", "normal");
             doc.text("Collection Pokémon", 105, 75, { align: "center" });
             doc.setFontSize(14);
-            doc.text(`Série: ${setDetail.serie.name}`, 30, 200);
+            doc.text(`Série: ${langSetDetail.serie.name}`, 30, 200);
             doc.text(`Mode: ${MODES.find(m => m.value === mode)?.label}`, 30, 210);
             doc.text(`Cartes: ${cards.length}`, 30, 220);
-            doc.text(`Langue: ${lang.toUpperCase()}`, 30, 230);
+            doc.text(`Langue: ${pdfLang.toUpperCase()}`, 30, 230);
             if (totalParts > 1) doc.text(`Partie ${part + 1} / ${totalParts}`, 30, 240);
             
             // Capture cover page preview
@@ -188,7 +206,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
                 .replace("_reverse_pokeball", "")
                 .replace("_reverse_masterball", "")
                 .replace("_reverse", "");
-              const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${localId}/high.png`;
+              const imgUrl = `https://assets.tcgdex.net/${pdfLang}/${langSetDetail.serie.id}/${langSetDetail.id}/${localId}/high.png`;
 
               try {
                 const dataUrl = await loadCardWithOverlays(imgUrl, {
@@ -222,20 +240,13 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
               setProgress(30 + globalProgress * 70);
             }
 
+            const langSuffix = selectedPdfLangs.length > 1 ? `_${pdfLang}` : "";
             const colorSuffix = isGrayscale ? "_nb" : "";
             const suffix = totalParts > 1 ? `_part${part + 1}` : "";
             const pdfBlob = doc.output("blob");
             
-            // Generate page previews from PDF
-            const previewUrls: string[] = [];
-            const totalPages = doc.getNumberOfPages();
-            for (let p = 1; p <= Math.min(totalPages, 5); p++) {
-              doc.setPage(p);
-              // We'll use a simple canvas approach for preview
-            }
-            
             files.push({
-              name: `${setDetail.name}_${mode}${colorSuffix}${suffix}.pdf`,
+              name: `${langSetDetail.name}${langSuffix}_${mode}${colorSuffix}${suffix}.pdf`,
               mode,
               blob: pdfBlob,
               type: "pdf",
@@ -246,6 +257,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
           toast.error(`Erreur pour le mode ${mode}`);
         }
       }
+    }
     }
 
     setGeneratedFiles(files);
@@ -424,6 +436,28 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
                   </div>
                 </div>
               </div>
+
+              {/* PDF Languages selector */}
+              <div className="border-t pt-3 mt-3">
+                <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                  🌍 Langues des PDFs :
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {AVAILABLE_LANGS.map((l) => (
+                    <button
+                      key={l.value}
+                      onClick={() => togglePdfLang(l.value)}
+                      className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                        selectedPdfLangs.includes(l.value)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-foreground border-border hover:bg-muted"
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -432,7 +466,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
           <div className="space-y-4 py-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              Fichier {currentFileIndex} / {selectedModes.length * colorModes.length}
+              Fichier {currentFileIndex} / {selectedModes.length * colorModes.length * selectedPdfLangs.length}
             </div>
             <Progress value={progress} className="h-3" />
             <p className="text-sm text-muted-foreground text-center">{currentStep}</p>
@@ -468,8 +502,8 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
           {!generating && generatedFiles.length === 0 && (
-            <Button onClick={handleGenerate} disabled={selectedModes.length === 0 || colorModes.length === 0}>
-              Générer {selectedModes.length > 0 && colorModes.length > 0 && `(${selectedModes.length * colorModes.length})`}
+            <Button onClick={handleGenerate} disabled={selectedModes.length === 0 || colorModes.length === 0 || selectedPdfLangs.length === 0}>
+              Générer {selectedModes.length > 0 && colorModes.length > 0 && selectedPdfLangs.length > 0 && `(${selectedModes.length * colorModes.length * selectedPdfLangs.length})`}
             </Button>
           )}
           {!generating && generatedFiles.length > 0 && (

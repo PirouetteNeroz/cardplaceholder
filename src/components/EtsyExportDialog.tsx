@@ -264,8 +264,8 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
               {generatedFiles.length} fichier(s) prêt(s) !
             </div>
             <div className="space-y-2">
-              {generatedFiles.map((file) => (
-                <div key={file.mode} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+              {generatedFiles.map((file, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
                   <span className="text-sm font-medium">{file.name}</span>
                   <Button size="sm" variant="outline" onClick={() => handleDownload(file)}>
                     <Download className="h-3 w-3 mr-1" />

@@ -1,5 +1,5 @@
 import type { SetDetail, Lang } from "@/lib/tcgdex-api";
-import { fetchSeriesDetail, processCards, type ExportMode } from "@/lib/tcgdex-api";
+import { processCards, type ExportMode } from "@/lib/tcgdex-api";
 import { loadCardWithOverlays } from "@/lib/pdf-utils";
 
 const SIZE = 1080;
@@ -13,12 +13,6 @@ const FLAG_URLS: Record<Lang, string> = {
   pt: "https://flagcdn.com/w80/pt.png",
   ja: "https://flagcdn.com/w80/jp.png",
 };
-
-const MODE_CONFIGS: { mode: ExportMode; label: string; badgeColor: string }[] = [
-  { mode: "complete", label: "Complete Set", badgeColor: "#22c55e" },
-  { mode: "master", label: "Master Set", badgeColor: "#3b82f6" },
-  { mode: "graded", label: "Graded Set", badgeColor: "#ef4444" },
-];
 
 async function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -61,13 +55,62 @@ export function hexToGradient(hex: string): { start: string; mid: string; end: s
   };
 }
 
+/** Load 9 card images for a specific mode */
+async function loadModeCards(
+  setDetail: SetDetail,
+  lang: Lang,
+  mode: "complete" | "master" | "graded" | "grayscale",
+  onProgress?: (loaded: number, total: number) => void
+): Promise<(string | null)[]> {
+  let cards;
+  const isGrayscale = mode === "grayscale";
+  const effectiveMode: ExportMode = isGrayscale ? "complete" : (mode as ExportMode);
+
+  try {
+    cards = await processCards(lang, setDetail, effectiveMode);
+  } catch {
+    // Fallback: use raw cards
+    cards = setDetail.cards.slice(0, 9).map(c => ({
+      ...c,
+      reverse: false,
+      reverseType: undefined as any,
+      graded: false,
+    }));
+  }
+
+  const sample = cards.slice(0, 9);
+  const results: (string | null)[] = [];
+
+  for (let i = 0; i < sample.length; i++) {
+    const card = sample[i];
+    let localId = card.localId
+      .replace("_reverse_pokeball", "")
+      .replace("_reverse_masterball", "")
+      .replace("_reverse", "");
+    const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${localId}/high.png`;
+    try {
+      const dataUrl = await loadCardWithOverlays(imgUrl, {
+        reverse: (card as any).reverse || false,
+        reverseType: (card as any).reverseType,
+        graded: (card as any).graded || false,
+        grayscale: isGrayscale,
+      });
+      results.push(dataUrl);
+    } catch {
+      results.push(null);
+    }
+    onProgress?.(i + 1, sample.length);
+  }
+
+  return results;
+}
+
 /** Generate a mini PDF page preview (3x3 card grid) on an offscreen canvas */
 async function generatePagePreview(
-  cardImages: (string | null)[],
-  grayscale: boolean = false
+  cardImages: (string | null)[]
 ): Promise<HTMLCanvasElement> {
   const pageW = 420;
-  const pageH = 594; // A4 ratio
+  const pageH = 594;
   const page = document.createElement("canvas");
   page.width = pageW;
   page.height = pageH;
@@ -80,7 +123,6 @@ async function generatePagePreview(
   const cardH = 176;
   const marginX = (pageW - cardW * 3) / 2;
   const marginY = 15;
-  let drawn = 0;
 
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
@@ -88,36 +130,21 @@ async function generatePagePreview(
       if (idx >= cardImages.length) break;
       const dataUrl = cardImages[idx];
       if (!dataUrl) continue;
-
       const x = marginX + col * cardW;
       const y = marginY + row * cardH;
-
       try {
         const img = await loadImage(dataUrl);
         pctx.drawImage(img, x, y, cardW, cardH);
-        drawn++;
       } catch {
         // skip
       }
     }
   }
 
-  if (grayscale && drawn > 0) {
-    const imageData = pctx.getImageData(0, 0, pageW, pageH);
-    const data = imageData.data;
-    for (let p = 0; p < data.length; p += 4) {
-      const gray = data[p] * 0.299 + data[p + 1] * 0.587 + data[p + 2] * 0.114;
-      data[p] = gray;
-      data[p + 1] = gray;
-      data[p + 2] = gray;
-    }
-    pctx.putImageData(imageData, 0, 0);
-  }
-
   return page;
 }
 
-/** Draw a page preview with shadow and rotation on the main canvas */
+/** Draw a page preview with shadow and rotation */
 function drawPageOnCanvas(
   ctx: CanvasRenderingContext2D,
   page: HTMLCanvasElement,
@@ -128,29 +155,25 @@ function drawPageOnCanvas(
   ctx.translate(x + w / 2, y + h / 2);
   ctx.rotate((rotation * Math.PI) / 180);
 
-  // Shadow
-  ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
-  ctx.shadowBlur = 25;
-  ctx.shadowOffsetX = 4;
-  ctx.shadowOffsetY = 6;
+  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetX = 5;
+  ctx.shadowOffsetY = 8;
 
-  // Page background
   ctx.fillStyle = "#fff";
   ctx.fillRect(-w / 2, -h / 2, w, h);
   ctx.shadowColor = "transparent";
 
-  // Draw page content
   ctx.drawImage(page, -w / 2, -h / 2, w, h);
 
-  // Border
-  ctx.strokeStyle = "rgba(0,0,0,0.12)";
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
   ctx.lineWidth = 1.5;
   ctx.strokeRect(-w / 2, -h / 2, w, h);
 
   ctx.restore();
 }
 
-/** Draw a badge label */
+/** Draw a badge pill label */
 function drawBadge(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -162,24 +185,23 @@ function drawBadge(
   ctx.translate(x, y);
   ctx.rotate((rotation * Math.PI) / 180);
 
-  ctx.font = "bold 20px Arial, sans-serif";
+  ctx.font = "bold 22px Arial, sans-serif";
   const textW = ctx.measureText(text).width;
-  const bw = textW + 30;
-  const bh = 34;
+  const bw = textW + 36;
+  const bh = 38;
 
-  ctx.shadowColor = "rgba(0,0,0,0.35)";
-  ctx.shadowBlur = 10;
+  ctx.shadowColor = "rgba(0,0,0,0.4)";
+  ctx.shadowBlur = 12;
   ctx.shadowOffsetY = 3;
 
-  roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 17);
+  roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 19);
   ctx.fillStyle = color;
   ctx.fill();
   ctx.shadowColor = "transparent";
 
-  // White border for contrast
-  ctx.strokeStyle = "rgba(255,255,255,0.5)";
-  ctx.lineWidth = 1.5;
-  roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 17);
+  ctx.strokeStyle = "rgba(255,255,255,0.6)";
+  ctx.lineWidth = 2;
+  roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 19);
   ctx.stroke();
 
   ctx.fillStyle = "#fff";
@@ -195,7 +217,8 @@ export async function generateEtsyVisual(
   lang: Lang,
   langs: Lang[],
   onProgress?: (pct: number) => void,
-  bgColor?: string
+  bgColor?: string,
+  customLogoUrl?: string
 ): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = SIZE;
@@ -213,9 +236,9 @@ export async function generateEtsyVisual(
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, SIZE, SIZE);
 
-  // Subtle pattern overlay
+  // Subtle grid overlay
   ctx.save();
-  ctx.globalAlpha = 0.06;
+  ctx.globalAlpha = 0.05;
   for (let i = 0; i < SIZE; i += 40) {
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = 1;
@@ -230,88 +253,120 @@ export async function generateEtsyVisual(
   }
   ctx.restore();
 
-  onProgress?.(5);
+  onProgress?.(4);
 
-  // === Load card images ===
-  const sampleCards = setDetail.cards.slice(0, 27);
-  const cardDataUrls: (string | null)[] = [];
+  // === Load mode-specific cards ===
+  const modes: ("complete" | "master" | "graded" | "grayscale")[] = ["complete", "master", "graded", "grayscale"];
+  const modeCardImages: Record<string, (string | null)[]> = {};
+  
+  for (let mi = 0; mi < modes.length; mi++) {
+    const m = modes[mi];
+    modeCardImages[m] = await loadModeCards(setDetail, lang, m, (loaded, total) => {
+      const modeBase = 4 + mi * 15;
+      onProgress?.(modeBase + (loaded / total) * 15);
+    });
+  }
 
-  for (let i = 0; i < sampleCards.length; i++) {
-    const card = sampleCards[i];
-    const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${card.localId}/high.png`;
+  onProgress?.(64);
+
+  // === Generate page previews per mode ===
+  const completePage = await generatePagePreview(modeCardImages["complete"]);
+  const masterPage = await generatePagePreview(modeCardImages["master"]);
+  const gradedPage = await generatePagePreview(modeCardImages["graded"]);
+  const grayscalePage = await generatePagePreview(modeCardImages["grayscale"]);
+
+  onProgress?.(68);
+
+  // === Scattered layout (inspired by reference) ===
+  // Positions: [x, y, w, h, rotation]
+  // Graded: bottom-left, large, slight rotation
+  // Complete: center-left, medium, overlapping
+  // Master: top-center, medium
+  // Grayscale: right side, medium
+
+  const pageW = 260;
+  const pageH = 368;
+  const smallW = 220;
+  const smallH = 312;
+
+  // Draw order: back to front
+  // Grayscale - right side
+  drawPageOnCanvas(ctx, grayscalePage, 680, 280, smallW, smallH, 4);
+  drawBadge(ctx, "Grayscale", 790, 310, "#8b5cf6", 4);
+
+  // Master - top center-right
+  drawPageOnCanvas(ctx, masterPage, 440, 180, smallW, smallH, -3);
+  drawBadge(ctx, "Master Set", 550, 210, "#3b82f6", -3);
+
+  // Complete - center-left
+  drawPageOnCanvas(ctx, completePage, 220, 320, pageW, pageH, -5);
+  drawBadge(ctx, "Complete Set", 350, 350, "#f97316", -5);
+
+  // Graded - bottom-left, largest & most prominent
+  drawPageOnCanvas(ctx, gradedPage, 30, 480, pageW + 30, pageH + 42, -8);
+  drawBadge(ctx, "Graded Set", 175, 520, "#ef4444", -8);
+
+  onProgress?.(75);
+
+  // === "Download, Print, Cut" header (top-left, bold) ===
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 48px Arial, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText("Download, Print, Cut", 40, 35);
+  ctx.restore();
+
+  onProgress?.(78);
+
+  // === Language flags (below header, top-left) ===
+  const flagSize = 50;
+  const flagGap = 14;
+  let flagX = 45;
+  const flagY = 100;
+
+  for (const l of langs) {
     try {
-      const dataUrl = await loadCardWithOverlays(imgUrl, {
-        reverse: false,
-        grayscale: false,
-      });
-      cardDataUrls.push(dataUrl);
+      const flagImg = await loadImage(FLAG_URLS[l]);
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.3)";
+      ctx.shadowBlur = 8;
+      const fh = flagSize * 0.67;
+      roundRect(ctx, flagX, flagY, flagSize, fh, 5);
+      ctx.clip();
+      ctx.drawImage(flagImg, flagX, flagY, flagSize, fh);
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 2;
+      roundRect(ctx, flagX, flagY, flagSize, fh, 5);
+      ctx.stroke();
+      ctx.restore();
     } catch {
-      cardDataUrls.push(null);
+      // skip
     }
-    onProgress?.(5 + ((i + 1) / sampleCards.length) * 40);
+    flagX += flagSize + flagGap;
   }
 
-  onProgress?.(45);
+  onProgress?.(82);
 
-  // === Generate page previews ===
-  const pageW = 240;
-  const pageH = 340;
-
-  const completePage = await generatePagePreview(cardDataUrls.slice(0, 9));
-  const masterPage = await generatePagePreview(
-    cardDataUrls.slice(9, 18).length >= 9 ? cardDataUrls.slice(9, 18) : cardDataUrls.slice(0, 9)
-  );
-  const gradedPage = await generatePagePreview(
-    cardDataUrls.slice(18, 27).length >= 9 ? cardDataUrls.slice(18, 27) : cardDataUrls.slice(0, 9)
-  );
-  const grayscalePage = await generatePagePreview(cardDataUrls.slice(0, 9), true);
-
-  onProgress?.(55);
-
-  // === Fan layout: 4 pages spread from bottom center like a hand of cards ===
-  const fanCenterX = SIZE / 2;
-  const fanCenterY = SIZE + 180; // pivot below canvas
-  const fanRadius = 620;
-  const angles = [-22, -8, 8, 22]; // spread angles
-  const pages = [gradedPage, completePage, masterPage, grayscalePage];
-  const pageLabels = ["Graded Set", "Complete Set", "Master Set", "Grayscale"];
-  const badgeColors = ["#ef4444", "#22c55e", "#3b82f6", "#6b7280"];
-
-  for (let i = 0; i < pages.length; i++) {
-    const angle = angles[i];
-    const rad = (angle * Math.PI) / 180;
-    const px = fanCenterX + Math.sin(rad) * fanRadius - pageW / 2;
-    const py = fanCenterY - Math.cos(rad) * fanRadius - pageH / 2;
-    drawPageOnCanvas(ctx, pages[i], px, py, pageW, pageH, angle);
-  }
-
-  onProgress?.(65);
-
-  // === Badges along the bottom of each page ===
-  for (let i = 0; i < pages.length; i++) {
-    const angle = angles[i];
-    const rad = (angle * Math.PI) / 180;
-    const bx = fanCenterX + Math.sin(rad) * (fanRadius - pageH / 2 + 30);
-    const by = fanCenterY - Math.cos(rad) * (fanRadius - pageH / 2 + 30);
-    drawBadge(ctx, pageLabels[i], bx, by, badgeColors[i], angle * 0.5);
-  }
-
-  onProgress?.(70);
-
-  // === Set logo (centered, upper area) ===
+  // === Set logo (centered) ===
+  const logoUrl = customLogoUrl || setDetail.logo;
   let logoImg: HTMLImageElement | null = null;
-  if (setDetail.logo) {
+  if (logoUrl) {
     try {
-      logoImg = await loadImage(setDetail.logo);
+      logoImg = await loadImage(logoUrl);
     } catch {
       // skip
     }
   }
 
-  const logoAreaY = 100;
   if (logoImg) {
-    const maxLogoW = 500;
-    const maxLogoH = 180;
+    const maxLogoW = 550;
+    const maxLogoH = 220;
     const logoAspect = logoImg.width / logoImg.height;
     let logoW = maxLogoW;
     let logoH = logoW / logoAspect;
@@ -321,91 +376,41 @@ export async function generateEtsyVisual(
     }
 
     const logoX = SIZE / 2 - logoW / 2;
-    const logoY = logoAreaY;
+    const logoY = SIZE / 2 - logoH / 2 - 40;
 
-    // Glow behind logo
+    // Strong glow
     ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-    ctx.shadowBlur = 35;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+    ctx.shadowBlur = 40;
     ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
     ctx.restore();
     ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
   } else {
+    // Fallback: set name as large text
     ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
-    ctx.shadowBlur = 20;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+    ctx.shadowBlur = 25;
     ctx.shadowOffsetY = 4;
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 60px Arial, sans-serif";
+    ctx.font = "bold 64px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(setDetail.name, SIZE / 2, logoAreaY + 80);
+    ctx.fillText(setDetail.name, SIZE / 2, SIZE / 2 - 40);
     ctx.restore();
   }
 
-  onProgress?.(80);
+  onProgress?.(90);
 
-  // === "Download · Print · Cut" header ===
+  // === Bottom CTA: "✨ Download ✨" ===
   ctx.save();
-  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetY = 2;
+  ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
   ctx.fillStyle = "#fff";
-  ctx.font = "bold 32px Arial, sans-serif";
+  ctx.font = "bold 52px Arial, sans-serif";
   ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillText("Download  ·  Print  ·  Cut", SIZE / 2, 30);
-  ctx.restore();
-
-  // === Language flags (horizontal row below logo) ===
-  const flagSize = 44;
-  const flagGap = 12;
-  const totalFlagW = langs.length * flagSize + (langs.length - 1) * flagGap;
-  let flagX = SIZE / 2 - totalFlagW / 2;
-  const flagY = logoImg ? logoAreaY + 200 : logoAreaY + 160;
-
-  for (const l of langs) {
-    try {
-      const flagImg = await loadImage(FLAG_URLS[l]);
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.3)";
-      ctx.shadowBlur = 6;
-      // Draw flag with rounded corners
-      const fh = flagSize * 0.67;
-      roundRect(ctx, flagX, flagY, flagSize, fh, 4);
-      ctx.clip();
-      ctx.drawImage(flagImg, flagX, flagY, flagSize, fh);
-      ctx.restore();
-      // Border
-      ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,0.5)";
-      ctx.lineWidth = 1.5;
-      roundRect(ctx, flagX, flagY, flagSize, fh, 4);
-      ctx.stroke();
-      ctx.restore();
-    } catch {
-      // skip
-    }
-    flagX += flagSize + flagGap;
-  }
-
-  onProgress?.(88);
-
-  // === Bottom CTA ===
-  ctx.save();
-  // Semi-transparent dark bar
-  const barH = 60;
-  const barY = SIZE - barH;
-  ctx.fillStyle = "rgba(0,0,0,0.4)";
-  ctx.fillRect(0, barY, SIZE, barH);
-  
-  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-  ctx.shadowBlur = 6;
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 30px Arial, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("✨  Instant Digital Download  ✨", SIZE / 2, barY + barH / 2);
+  ctx.textBaseline = "bottom";
+  ctx.fillText("✨ Download ✨", SIZE / 2, SIZE - 30);
   ctx.restore();
 
   onProgress?.(95);

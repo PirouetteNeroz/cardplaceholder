@@ -480,8 +480,8 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
           {!generating && generatedFiles.length === 0 && (
-            <Button onClick={handleGenerate} disabled={selectedModes.length === 0 || colorModes.length === 0}>
-              Générer {selectedModes.length > 0 && colorModes.length > 0 && `(${selectedModes.length * colorModes.length})`}
+            <Button onClick={handleGenerate} disabled={selectedModes.length === 0 || colorModes.length === 0 || selectedPdfLangs.length === 0}>
+              Générer {selectedModes.length > 0 && colorModes.length > 0 && selectedPdfLangs.length > 0 && `(${selectedModes.length * colorModes.length * selectedPdfLangs.length})`}
             </Button>
           )}
           {!generating && generatedFiles.length > 0 && (

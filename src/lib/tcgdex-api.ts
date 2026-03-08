@@ -123,8 +123,8 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
   const res = await fetch(`${BASE_URL}/${lang}/cards?illustrator=${encodeURIComponent(illustrator)}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const cards: CardListItem[] = await res.json();
-  // Filter out Pokémon Pocket cards (series "tcgp")
-  const filtered = cards.filter((c) => !c.id.startsWith("tcgp-"));
+  // Filter out Pokémon Pocket cards
+  let filtered = cards.filter((c) => !c.id.startsWith("tcgp-"));
 
   // Extract unique set IDs from card IDs (format: "setId-localId")
   const setIds = [...new Set(filtered.map((c) => c.id.replace(/-[^-]+$/, "")))];
@@ -156,6 +156,13 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
       card.releaseDate = info.releaseDate;
     }
   }
+
+  // Filter out "Jeu de Cartes à Collectionner" / "Trading Card Game" series
+  const EXCLUDED_SERIES = ["jeu de cartes à collectionner", "trading card game", "sammelkartenspiel"];
+  filtered = filtered.filter((c) => {
+    const sn = (c.serieName || "").toLowerCase();
+    return !EXCLUDED_SERIES.some((ex) => sn.includes(ex));
+  });
 
   // Sort by release date, then by localId within same set
   filtered.sort((a, b) => {

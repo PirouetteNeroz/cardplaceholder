@@ -119,7 +119,12 @@ export interface CardListItem {
 export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): Promise<CardListItem[]> {
   const res = await fetch(`${BASE_URL}/${lang}/cards?illustrator=${encodeURIComponent(illustrator)}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  const cards: CardListItem[] = await res.json();
+  // Filter out Pokémon Pocket cards (series "tcgp")
+  const filtered = cards.filter((c) => !c.id.startsWith("tcgp-"));
+  // Sort by ID to approximate creation/release order
+  filtered.sort((a, b) => a.id.localeCompare(b.id));
+  return filtered;
 }
 
 export function getCardImageUrl(lang: Lang, serieId: string, setId: string, localId: string): string {

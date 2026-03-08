@@ -154,10 +154,10 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
             blob: pdfBlob,
           });
         }
-      }
       } catch (e) {
         console.error(e);
         toast.error(`Erreur pour le mode ${mode}`);
+      }
       }
     }
 

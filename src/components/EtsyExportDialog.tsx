@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { ShoppingBag, Download, Loader2, CheckCircle2, Palette, Image as ImageIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ShoppingBag, Download, Loader2, CheckCircle2, Palette, Image as ImageIcon, Archive, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { ExportMode, SetDetail, Lang } from "@/lib/tcgdex-api";
 import { processCards } from "@/lib/tcgdex-api";
@@ -28,10 +29,23 @@ const AVAILABLE_LANGS: { value: Lang; label: string }[] = [
   { value: "ja", label: "🇯🇵 JA" },
 ];
 
+const BG_PRESETS = [
+  { color: "#2d1b69", label: "Violet" },
+  { color: "#1a3a1a", label: "Vert" },
+  { color: "#691b1b", label: "Rouge" },
+  { color: "#1b3569", label: "Bleu" },
+  { color: "#694b1b", label: "Or" },
+  { color: "#1a1a1a", label: "Noir" },
+  { color: "#2d2d2d", label: "Gris" },
+  { color: "#0d3b4f", label: "Cyan" },
+];
+
 interface GeneratedFile {
   name: string;
-  mode: ExportMode;
+  mode?: ExportMode;
   blob: Blob;
+  type: "pdf" | "image";
+  pagePreviewUrls?: string[];
 }
 
 interface Props {
@@ -49,12 +63,17 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   const [currentStep, setCurrentStep] = useState("");
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
+  const [bgColor, setBgColor] = useState("#2d1b69");
 
   // Visual generator state
   const [generatingVisual, setGeneratingVisual] = useState(false);
   const [visualProgress, setVisualProgress] = useState(0);
   const [selectedVisualLangs, setSelectedVisualLangs] = useState<Lang[]>([lang]);
   const [visualPreview, setVisualPreview] = useState<string | null>(null);
+
+  // Preview state
+  const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null);
+  const [previewPage, setPreviewPage] = useState(0);
 
   const toggleMode = (mode: ExportMode) => {
     setSelectedModes((prev) =>
@@ -83,12 +102,12 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
         setDetail,
         lang,
         selectedVisualLangs.length > 0 ? selectedVisualLangs : [lang],
-        (pct) => setVisualProgress(pct)
+        (pct) => setVisualProgress(pct),
+        bgColor
       );
       const url = URL.createObjectURL(blob);
       setVisualPreview(url);
 
-      // Auto-download
       const a = document.createElement("a");
       a.href = url;
       a.download = `${setDetail.name}_etsy_visual.png`;
@@ -119,96 +138,113 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
         setCurrentStep(`Traitement (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
         setProgress(0);
 
-      try {
-        const cards = await processCards(lang, setDetail, mode, (pct) => {
-          setProgress(pct * 0.3);
-        });
-
-        setCurrentStep(`Génération du PDF (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
-        const { jsPDF } = await import("jspdf");
-
-        const cardsPerPage = 9;
-        const maxPagesPerPDF = 15;
-        const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF;
-        const totalParts = Math.ceil(cards.length / maxCardsPerPDF);
-
-        for (let part = 0; part < totalParts; part++) {
-          const startIdx = part * maxCardsPerPDF;
-          const endIdx = Math.min(startIdx + maxCardsPerPDF, cards.length);
-          const chunk = cards.slice(startIdx, endIdx);
-
-          const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
-          // Cover page
-          doc.setFontSize(32);
-          doc.setFont("helvetica", "bold");
-          doc.text(setDetail.name, 105, 60, { align: "center" });
-          doc.setFontSize(18);
-          doc.setFont("helvetica", "normal");
-          doc.text("Collection Pokémon", 105, 75, { align: "center" });
-          doc.setFontSize(14);
-          doc.text(`Série: ${setDetail.serie.name}`, 30, 200);
-          doc.text(`Mode: ${MODES.find(m => m.value === mode)?.label}`, 30, 210);
-          doc.text(`Cartes: ${cards.length}`, 30, 220);
-          doc.text(`Langue: ${lang.toUpperCase()}`, 30, 230);
-          if (totalParts > 1) doc.text(`Partie ${part + 1} / ${totalParts}`, 30, 240);
-          doc.addPage();
-
-          const cardW = 63, cardH = 88;
-          const marginX = (210 - cardW * 3) / 2;
-          let x = marginX, y = 20, count = 0;
-
-          for (let ci = 0; ci < chunk.length; ci++) {
-            const card = chunk[ci];
-            let localId = card.localId
-              .replace("_reverse_pokeball", "")
-              .replace("_reverse_masterball", "")
-              .replace("_reverse", "");
-            const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${localId}/high.png`;
-
-            try {
-              const dataUrl = await loadCardWithOverlays(imgUrl, {
-                reverse: card.reverse,
-                reverseType: card.reverseType,
-                graded: card.graded,
-                grayscale: isGrayscale,
-              });
-              if (dataUrl) {
-                doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
-              }
-            } catch {
-              // skip
-            }
-
-            x += cardW;
-            count++;
-            if (count % 3 === 0) {
-              x = marginX;
-              y += cardH;
-              if (count % 9 === 0 && count < chunk.length) {
-                doc.addPage();
-                x = marginX;
-                y = 20;
-              }
-            }
-
-            const globalProgress = (startIdx + ci + 1) / cards.length;
-            setProgress(30 + globalProgress * 70);
-          }
-
-          const colorSuffix = isGrayscale ? "_nb" : "";
-          const suffix = totalParts > 1 ? `_part${part + 1}` : "";
-          const pdfBlob = doc.output("blob");
-          files.push({
-            name: `${setDetail.name}_${mode}${colorSuffix}${suffix}.pdf`,
-            mode,
-            blob: pdfBlob,
+        try {
+          const cards = await processCards(lang, setDetail, mode, (pct) => {
+            setProgress(pct * 0.3);
           });
+
+          setCurrentStep(`Génération du PDF (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
+          const { jsPDF } = await import("jspdf");
+
+          const cardsPerPage = 9;
+          const maxPagesPerPDF = 15;
+          const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF;
+          const totalParts = Math.ceil(cards.length / maxCardsPerPDF);
+
+          for (let part = 0; part < totalParts; part++) {
+            const startIdx = part * maxCardsPerPDF;
+            const endIdx = Math.min(startIdx + maxCardsPerPDF, cards.length);
+            const chunk = cards.slice(startIdx, endIdx);
+
+            const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+            const pageCanvases: string[] = [];
+
+            // Cover page
+            doc.setFontSize(32);
+            doc.setFont("helvetica", "bold");
+            doc.text(setDetail.name, 105, 60, { align: "center" });
+            doc.setFontSize(18);
+            doc.setFont("helvetica", "normal");
+            doc.text("Collection Pokémon", 105, 75, { align: "center" });
+            doc.setFontSize(14);
+            doc.text(`Série: ${setDetail.serie.name}`, 30, 200);
+            doc.text(`Mode: ${MODES.find(m => m.value === mode)?.label}`, 30, 210);
+            doc.text(`Cartes: ${cards.length}`, 30, 220);
+            doc.text(`Langue: ${lang.toUpperCase()}`, 30, 230);
+            if (totalParts > 1) doc.text(`Partie ${part + 1} / ${totalParts}`, 30, 240);
+            
+            // Capture cover page preview
+            pageCanvases.push(doc.output("datauristring"));
+            doc.addPage();
+
+            const cardW = 63, cardH = 88;
+            const marginX = (210 - cardW * 3) / 2;
+            let x = marginX, y = 20, count = 0;
+            let currentPageCardCount = 0;
+
+            for (let ci = 0; ci < chunk.length; ci++) {
+              const card = chunk[ci];
+              let localId = card.localId
+                .replace("_reverse_pokeball", "")
+                .replace("_reverse_masterball", "")
+                .replace("_reverse", "");
+              const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${localId}/high.png`;
+
+              try {
+                const dataUrl = await loadCardWithOverlays(imgUrl, {
+                  reverse: card.reverse,
+                  reverseType: card.reverseType,
+                  graded: card.graded,
+                  grayscale: isGrayscale,
+                });
+                if (dataUrl) {
+                  doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
+                }
+              } catch {
+                // skip
+              }
+
+              x += cardW;
+              count++;
+              currentPageCardCount++;
+              if (count % 3 === 0) {
+                x = marginX;
+                y += cardH;
+                if (count % 9 === 0 && count < chunk.length) {
+                  doc.addPage();
+                  x = marginX;
+                  y = 20;
+                  currentPageCardCount = 0;
+                }
+              }
+
+              const globalProgress = (startIdx + ci + 1) / cards.length;
+              setProgress(30 + globalProgress * 70);
+            }
+
+            const colorSuffix = isGrayscale ? "_nb" : "";
+            const suffix = totalParts > 1 ? `_part${part + 1}` : "";
+            const pdfBlob = doc.output("blob");
+            
+            // Generate page previews from PDF
+            const previewUrls: string[] = [];
+            const totalPages = doc.getNumberOfPages();
+            for (let p = 1; p <= Math.min(totalPages, 5); p++) {
+              doc.setPage(p);
+              // We'll use a simple canvas approach for preview
+            }
+            
+            files.push({
+              name: `${setDetail.name}_${mode}${colorSuffix}${suffix}.pdf`,
+              mode,
+              blob: pdfBlob,
+              type: "pdf",
+            });
+          }
+        } catch (e) {
+          console.error(e);
+          toast.error(`Erreur pour le mode ${mode}`);
         }
-      } catch (e) {
-        console.error(e);
-        toast.error(`Erreur pour le mode ${mode}`);
-      }
       }
     }
 
@@ -228,8 +264,23 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
     URL.revokeObjectURL(url);
   };
 
-  const handleDownloadAll = () => {
-    generatedFiles.forEach((file) => handleDownload(file));
+  const handleDownloadZip = async () => {
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      generatedFiles.forEach((file) => zip.file(file.name, file.blob));
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${setDetail?.name}_etsy_export.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("ZIP téléchargé !");
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur lors de la création du ZIP");
+    }
   };
 
   return (
@@ -256,9 +307,32 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
                 <ImageIcon className="h-4 w-4 text-primary" />
                 Visuel promotionnel (1080×1080)
               </h3>
-              <p className="text-xs text-muted-foreground">
-                Génère automatiquement une image pour votre annonce Etsy avec aperçu des cartes, badges des modes et drapeaux.
-              </p>
+
+              {/* Background color picker */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Palette className="h-3 w-3" /> Couleur de fond :
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {BG_PRESETS.map((preset) => (
+                    <button
+                      key={preset.color}
+                      onClick={() => setBgColor(preset.color)}
+                      className={`w-7 h-7 rounded-full border-2 transition-all ${
+                        bgColor === preset.color ? "border-primary scale-110 ring-2 ring-primary/30" : "border-border hover:scale-105"
+                      }`}
+                      style={{ backgroundColor: preset.color }}
+                      title={preset.label}
+                    />
+                  ))}
+                  <Input
+                    type="color"
+                    value={bgColor}
+                    onChange={(e) => setBgColor(e.target.value)}
+                    className="w-8 h-8 p-0.5 rounded cursor-pointer border-border"
+                  />
+                </div>
+              </div>
 
               <div className="flex flex-wrap gap-2">
                 {AVAILABLE_LANGS.map((l) => (
@@ -367,40 +441,47 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
 
         {!generating && generatedFiles.length > 0 && (
           <div className="space-y-3 py-2">
-            <div className="flex items-center gap-2 text-sm text-green-600">
+            <div className="flex items-center gap-2 text-sm text-primary">
               <CheckCircle2 className="h-4 w-4" />
               {generatedFiles.length} fichier(s) prêt(s) !
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
               {generatedFiles.map((file, idx) => (
                 <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                  <span className="text-sm font-medium">{file.name}</span>
-                  <Button size="sm" variant="outline" onClick={() => handleDownload(file)}>
-                    <Download className="h-3 w-3 mr-1" />
-                    Télécharger
-                  </Button>
+                  <span className="text-sm font-medium truncate flex-1">{file.name}</span>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => {
+                      const url = URL.createObjectURL(file.blob);
+                      window.open(url, "_blank");
+                    }}>
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleDownload(file)}>
+                      <Download className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           {!generating && generatedFiles.length === 0 && (
             <Button onClick={handleGenerate} disabled={selectedModes.length === 0 || colorModes.length === 0}>
               Générer {selectedModes.length > 0 && colorModes.length > 0 && `(${selectedModes.length * colorModes.length})`}
             </Button>
           )}
-          {!generating && generatedFiles.length > 1 && (
-            <Button onClick={handleDownloadAll}>
-              <Download className="mr-2 h-4 w-4" />
-              Tout télécharger
-            </Button>
-          )}
           {!generating && generatedFiles.length > 0 && (
-            <Button variant="outline" onClick={() => { setGeneratedFiles([]); setSelectedModes([]); setColorModes(["color"]); setProgress(0); }}>
-              Nouveau export
-            </Button>
+            <>
+              <Button onClick={handleDownloadZip} className="w-full sm:w-auto">
+                <Archive className="mr-2 h-4 w-4" />
+                Télécharger ZIP
+              </Button>
+              <Button variant="outline" onClick={() => { setGeneratedFiles([]); setSelectedModes([]); setColorModes(["color"]); setProgress(0); }} className="w-full sm:w-auto">
+                Nouveau export
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>

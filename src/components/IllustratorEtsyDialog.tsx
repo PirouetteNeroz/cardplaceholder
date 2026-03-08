@@ -4,10 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ShoppingBag, Download, Loader2, CheckCircle2, Palette, Archive, Image } from "lucide-react";
+import { ShoppingBag, Download, Loader2, CheckCircle2, Palette, Archive, Image, Eye } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { Lang, CardListItem } from "@/lib/tcgdex-api";
 import { toast } from "sonner";
+
+const BG_PRESETS = [
+  { color: "#2d1b69", label: "Violet" },
+  { color: "#1a3a1a", label: "Vert" },
+  { color: "#691b1b", label: "Rouge" },
+  { color: "#1b3569", label: "Bleu" },
+  { color: "#694b1b", label: "Or" },
+  { color: "#1a1a1a", label: "Noir" },
+  { color: "#2d2d2d", label: "Gris" },
+  { color: "#0d3b4f", label: "Cyan" },
+];
 
 interface GeneratedFile {
   name: string;
@@ -31,6 +42,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
   const [maxPagesPerPDF, setMaxPagesPerPDF] = useState(15);
   const [includePromoVisual, setIncludePromoVisual] = useState(true);
+  const [bgColor, setBgColor] = useState("#2d1b69");
 
   const toggleColorMode = (cm: "color" | "grayscale") => {
     setColorModes((prev) =>
@@ -58,7 +70,8 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
           entityLabel,
           cards,
           lang,
-          (pct) => setProgress((jobIndex - 1) / totalJobs * 100 + pct / totalJobs)
+          (pct) => setProgress((jobIndex - 1) / totalJobs * 100 + pct / totalJobs),
+          bgColor
         );
         files.push({
           name: `${entityName}_promo.png`,
@@ -136,7 +149,6 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
             }
 
             if (!hasImage) {
-              // Draw placeholder with Pokéball
               canvas.width = canvasW;
               canvas.height = canvasH;
               ctx.fillStyle = isGrayscale ? "#e0e0e0" : "#f0f0f0";
@@ -148,16 +160,13 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
               ctx.beginPath();
               ctx.arc(cx, cy, r, 0, Math.PI * 2);
               ctx.stroke();
-              // horizontal line
               ctx.beginPath();
               ctx.moveTo(cx - r, cy);
               ctx.lineTo(cx + r, cy);
               ctx.stroke();
-              // center circle
               ctx.beginPath();
               ctx.arc(cx, cy, r * 0.25, 0, Math.PI * 2);
               ctx.stroke();
-              // top half fill
               ctx.fillStyle = isGrayscale ? "#aaa" : "#cc0000";
               ctx.beginPath();
               ctx.arc(cx, cy, r - ctx.lineWidth / 2, Math.PI, 0);
@@ -165,7 +174,6 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
               ctx.fill();
             }
 
-            // Grayscale conversion (for loaded images)
             if (isGrayscale && hasImage) {
               const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
               const data = imageData.data;
@@ -178,7 +186,6 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
               ctx.putImageData(imageData, 0, 0);
             }
 
-            // Draw set name + number overlay
             const labelText = `${card.setName || ""} #${card.localId}`;
             const fontSize = Math.round(canvas.width * 0.045);
             ctx.font = `bold ${fontSize}px Arial`;
@@ -239,15 +246,10 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
   };
 
   const handleDownloadZip = async () => {
-    setCurrentStep("Création du ZIP...");
     try {
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
-      
-      generatedFiles.forEach((file) => {
-        zip.file(file.name, file.blob);
-      });
-
+      generatedFiles.forEach((file) => zip.file(file.name, file.blob));
       const zipBlob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement("a");
@@ -317,6 +319,32 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
               </div>
             </div>
 
+            {/* Background color for promo */}
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Palette className="h-3 w-3" /> Couleur de fond du visuel :
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                {BG_PRESETS.map((preset) => (
+                  <button
+                    key={preset.color}
+                    onClick={() => setBgColor(preset.color)}
+                    className={`w-7 h-7 rounded-full border-2 transition-all ${
+                      bgColor === preset.color ? "border-primary scale-110 ring-2 ring-primary/30" : "border-border hover:scale-105"
+                    }`}
+                    style={{ backgroundColor: preset.color }}
+                    title={preset.label}
+                  />
+                ))}
+                <Input
+                  type="color"
+                  value={bgColor}
+                  onChange={(e) => setBgColor(e.target.value)}
+                  className="w-8 h-8 p-0.5 rounded cursor-pointer border-border"
+                />
+              </div>
+            </div>
+
             <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
               <Checkbox
                 id="include-promo"
@@ -352,15 +380,39 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
               <CheckCircle2 className="h-4 w-4" />
               {generatedFiles.length} fichier(s) prêt(s) !
             </div>
-            <div className="space-y-2 max-h-[200px] overflow-y-auto">
-              {generatedFiles.map((file, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                  <span className="text-sm font-medium truncate flex-1">{file.name}</span>
-                  <Button size="sm" variant="ghost" onClick={() => handleDownload(file)}>
-                    <Download className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
+            <div className="space-y-2 max-h-[250px] overflow-y-auto">
+              {generatedFiles.map((file, idx) => {
+                const isImage = file.name.endsWith(".png") || file.name.endsWith(".jpg");
+                return (
+                  <div key={idx} className="rounded-lg border bg-muted/30 overflow-hidden">
+                    {isImage && (
+                      <div className="p-2">
+                        <img
+                          src={URL.createObjectURL(file.blob)}
+                          alt={file.name}
+                          className="w-full rounded border"
+                        />
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between p-3">
+                      <span className="text-sm font-medium truncate flex-1">{file.name}</span>
+                      <div className="flex gap-1">
+                        {!isImage && (
+                          <Button size="sm" variant="ghost" onClick={() => {
+                            const url = URL.createObjectURL(file.blob);
+                            window.open(url, "_blank");
+                          }}>
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" onClick={() => handleDownload(file)}>
+                          <Download className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

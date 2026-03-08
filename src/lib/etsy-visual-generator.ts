@@ -160,31 +160,15 @@ function drawPageOnCanvas(
   ctx.translate(x + w / 2, y + h / 2);
   ctx.rotate((rotation * Math.PI) / 180);
 
-  // Deep shadow
-  ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-  ctx.shadowBlur = 40;
-  ctx.shadowOffsetX = 8;
-  ctx.shadowOffsetY = 12;
+  // Shadow only
+  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetX = 5;
+  ctx.shadowOffsetY = 8;
 
-  // White page background with rounded corners
-  const r = 8;
-  roundRect(ctx, -w / 2, -h / 2, w, h, r);
-  ctx.fillStyle = "#fff";
-  ctx.fill();
-  ctx.shadowColor = "transparent";
-
-  // Clip and draw content
-  ctx.save();
-  roundRect(ctx, -w / 2, -h / 2, w, h, r);
-  ctx.clip();
+  // Draw content directly (no white background)
   ctx.drawImage(page, -w / 2, -h / 2, w, h);
-  ctx.restore();
-
-  // Border
-  ctx.strokeStyle = "rgba(0,0,0,0.12)";
-  ctx.lineWidth = 1.5;
-  roundRect(ctx, -w / 2, -h / 2, w, h, r);
-  ctx.stroke();
+  ctx.shadowColor = "transparent";
 
   ctx.restore();
 }

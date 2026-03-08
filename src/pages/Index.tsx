@@ -189,7 +189,8 @@ const Index = () => {
         }
 
         const suffix = totalParts > 1 ? `_part${part + 1}` : "";
-        doc.save(`${setDetail.name}_${mode}${suffix}.pdf`);
+        const modeLabel = mode === "complete" ? "complete-set" : mode === "master" ? "master-set" : mode === "graded" ? "graded-set" : "special-set";
+        doc.save(`${lang.toUpperCase()}_${setDetail.name}_${modeLabel}${suffix}.pdf`);
       }
 
       setPdfStep("Finalisation...");

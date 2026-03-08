@@ -218,7 +218,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${setDetail.name}_etsy_visual.png`;
+      a.download = `${lang.toUpperCase()}_${setDetail.name}_etsy_visual.png`;
       a.click();
 
       toast.success("Visuel Etsy généré !");

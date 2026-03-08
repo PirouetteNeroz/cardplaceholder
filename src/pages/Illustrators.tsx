@@ -116,10 +116,8 @@ const Illustrators = () => {
         }
 
         const cardW = 63, cardH = 88;
-        const labelH = 10; // space for label below card
-        const totalCardH = cardH + labelH;
         const marginX = (210 - cardW * 3) / 2;
-        let x = marginX, y = 15, count = 0;
+        let x = marginX, y = 20, count = 0;
 
         for (let i = 0; i < chunk.length; i++) {
           const card = chunk[i];
@@ -138,6 +136,21 @@ const Illustrators = () => {
               canvas.height = img.height;
               const ctx = canvas.getContext("2d")!;
               ctx.drawImage(img, 0, 0);
+
+              // Draw set name + number overlay on the card image
+              const labelText = `${card.setName || ""} #${card.localId}`;
+              const fontSize = Math.round(img.width * 0.045);
+              ctx.font = `bold ${fontSize}px Arial`;
+              const textWidth = ctx.measureText(labelText).width;
+              const padding = fontSize * 0.4;
+              const boxX = img.width - textWidth - padding * 2 - 8;
+              const boxY = img.height - fontSize - padding * 2 - 8;
+              ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+              ctx.roundRect(boxX, boxY, textWidth + padding * 2, fontSize + padding * 2, 6);
+              ctx.fill();
+              ctx.fillStyle = "#ffffff";
+              ctx.fillText(labelText, boxX + padding, boxY + padding + fontSize * 0.85);
+
               const dataUrl = canvas.toDataURL("image/png");
               doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
             } catch {
@@ -145,23 +158,15 @@ const Illustrators = () => {
             }
           }
 
-          // Draw serie name + card number below the card
-          const labelText = `${card.serieName || ""} #${card.localId}`;
-          doc.setFontSize(7);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(100, 100, 100);
-          doc.text(labelText, x + cardW - 1, y + cardH + 4, { align: "right" });
-          doc.setTextColor(0, 0, 0);
-
           x += cardW;
           count++;
           if (count % 3 === 0) {
             x = marginX;
-            y += totalCardH;
+            y += cardH;
             if (count % 9 === 0 && count < chunk.length) {
               doc.addPage();
               x = marginX;
-              y = 15;
+              y = 20;
             }
           }
         }
@@ -296,16 +301,20 @@ const Illustrators = () => {
                       key={card.id}
                       className="bg-card rounded-lg p-2 text-center card-glow card-glow-hover transition-transform hover:-translate-y-1 border-t-4 border-t-primary"
                     >
-                      {card.image && (
-                        <img
-                          src={`${card.image}/high.png`}
-                          alt={card.name}
-                          className="w-full rounded"
-                          loading="lazy"
-                        />
-                      )}
+                      <div className="relative">
+                        {card.image && (
+                          <img
+                            src={`${card.image}/high.png`}
+                            alt={card.name}
+                            className="w-full rounded"
+                            loading="lazy"
+                          />
+                        )}
+                        <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded">
+                          {card.setName} #{card.localId}
+                        </span>
+                      </div>
                       <p className="text-xs font-semibold mt-2 truncate text-card-foreground">{card.name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{card.serieName} #{card.localId}</p>
                     </div>
                   ))}
                 </div>

@@ -108,12 +108,16 @@ const Index = () => {
       toast.error("Veuillez d'abord charger un set");
       return;
     }
-    toast.info("Export PDF en cours...");
+    setPdfGenerating(true);
+    setPdfProgress(0);
+    setPdfStep("Initialisation...");
     try {
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-      // Cover page
+      setPdfStep("Page de couverture...");
+      setPdfProgress(5);
+
       doc.setFontSize(32);
       doc.setFont("helvetica", "bold");
       doc.text(setDetail.name, 105, 60, { align: "center" });
@@ -127,12 +131,15 @@ const Index = () => {
       doc.text(`Langue: ${lang.toUpperCase()}`, 30, 230);
       doc.addPage();
 
-      // Cards
       const cardW = 63, cardH = 88;
       const marginX = (210 - cardW * 3) / 2;
       let x = marginX, y = 20, count = 0;
 
-      for (const card of processedCards) {
+      for (let i = 0; i < processedCards.length; i++) {
+        const card = processedCards[i];
+        setPdfStep(`Carte ${i + 1} / ${processedCards.length}...`);
+        setPdfProgress(5 + ((i + 1) / processedCards.length) * 90);
+
         let localId = card.localId
           .replace("_reverse_pokeball", "")
           .replace("_reverse_masterball", "")
@@ -149,7 +156,7 @@ const Index = () => {
           });
           doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
         } catch {
-          // skip failed images
+          // skip
         }
 
         x += cardW;
@@ -165,12 +172,15 @@ const Index = () => {
         }
       }
 
+      setPdfStep("Finalisation...");
+      setPdfProgress(100);
       doc.save(`${setDetail.name}_${mode}.pdf`);
       toast.success("PDF téléchargé !");
     } catch (e) {
       toast.error("Erreur lors de la génération du PDF");
       console.error(e);
     }
+    setTimeout(() => setPdfGenerating(false), 800);
   }, [setDetail, processedCards, lang, mode]);
 
   // Derive table data

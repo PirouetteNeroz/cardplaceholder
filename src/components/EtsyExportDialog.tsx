@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import type { ExportMode, SetDetail, Lang } from "@/lib/tcgdex-api";
 import { processCards } from "@/lib/tcgdex-api";
 import { toast } from "sonner";
+import { loadCardWithOverlays } from "@/lib/pdf-utils";
 
 const MODES: { value: ExportMode; label: string; description: string }[] = [
   { value: "complete", label: "Complete Set", description: "Toutes les cartes du set" },
@@ -92,14 +93,14 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
           const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${localId}/high.png`;
 
           try {
-            const resp = await fetch(imgUrl, { mode: "cors" });
-            const blob = await resp.blob();
-            const dataUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(blob);
+            const dataUrl = await loadCardWithOverlays(imgUrl, {
+              reverse: card.reverse,
+              reverseType: card.reverseType,
+              graded: card.graded,
             });
-            doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
+            if (dataUrl) {
+              doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
+            }
           } catch {
             // skip
           }

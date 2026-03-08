@@ -16,6 +16,7 @@ import { PdfProgressDialog } from "@/components/PdfProgressDialog";
 import { EtsyExportDialog } from "@/components/EtsyExportDialog";
 import { Loader2, Download, BookOpen, Layers } from "lucide-react";
 import { toast } from "sonner";
+import { loadCardWithOverlays } from "@/lib/pdf-utils";
 
 const LANGS: { value: Lang; label: string }[] = [
   { value: "fr", label: "Français" },

@@ -72,6 +72,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
   const [visualProgress, setVisualProgress] = useState(0);
   const [selectedVisualLangs, setSelectedVisualLangs] = useState<Lang[]>([lang]);
   const [visualPreview, setVisualPreview] = useState<string | null>(null);
+  const [customLogoUrl, setCustomLogoUrl] = useState("");
 
   // PNG page export state
   const [pngModes, setPngModes] = useState<ExportMode[]>([]);

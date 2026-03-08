@@ -176,16 +176,28 @@ const Illustrators = () => {
                       key={card.id}
                       className="bg-card rounded-lg p-2 text-center card-glow card-glow-hover transition-transform hover:-translate-y-1 border-t-4 border-t-primary"
                     >
-                      <div className="relative">
-                        {card.image && (
+                      <div className="relative aspect-[2/3] bg-muted rounded overflow-hidden flex items-center justify-center">
+                        {card.image ? (
                           <img
                             src={`${card.image}/high.png`}
                             alt={card.name}
-                            className="w-full rounded"
+                            className="w-full h-full object-cover rounded"
                             loading="lazy"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = "none";
+                              target.parentElement?.classList.add("show-fallback");
+                            }}
                           />
-                        )}
-                        <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded">
+                        ) : null}
+                        <div className={`absolute inset-0 flex items-center justify-center ${card.image ? "hidden" : ""} fallback-icon`}>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="w-16 h-16 opacity-30">
+                            <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" strokeWidth="4"/>
+                            <line x1="2" y1="50" x2="98" y2="50" stroke="currentColor" strokeWidth="4"/>
+                            <circle cx="50" cy="50" r="12" fill="none" stroke="currentColor" strokeWidth="4"/>
+                          </svg>
+                        </div>
+                        <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded z-10">
                           {card.setName} #{card.localId}
                         </span>
                       </div>

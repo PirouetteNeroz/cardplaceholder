@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ShoppingBag, Download, Loader2, CheckCircle2, Palette, Image as ImageIcon, Archive, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { ShoppingBag, Download, Loader2, CheckCircle2, Palette, Image as ImageIcon, Archive, ChevronLeft, ChevronRight, Eye, FileImage } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { ExportMode, SetDetail, Lang } from "@/lib/tcgdex-api";
 import { processCards, fetchSetDetail } from "@/lib/tcgdex-api";
 import { toast } from "sonner";
 import { loadCardWithOverlays } from "@/lib/pdf-utils";
 import { generateEtsyVisual } from "@/lib/etsy-visual-generator";
+import { renderPageAsPng, getTotalPages } from "@/lib/page-png-generator";
 
 const MODES: { value: ExportMode; label: string; description: string }[] = [
   { value: "complete", label: "Complete Set", description: "Toutes les cartes du set" },

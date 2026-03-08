@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        display: ['Space Grotesk', 'sans-serif'],
+        body: ['Inter', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -57,6 +61,23 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        rarity: {
+          common: "hsl(var(--rarity-common))",
+          uncommon: "hsl(var(--rarity-uncommon))",
+          rare: "hsl(var(--rarity-rare))",
+          "double-rare": "hsl(var(--rarity-double-rare))",
+          ultra: "hsl(var(--rarity-ultra))",
+          illustration: "hsl(var(--rarity-illustration))",
+          special: "hsl(var(--rarity-special))",
+          bw: "hsl(var(--rarity-bw))",
+          hightech: "hsl(var(--rarity-hightech))",
+        },
+        reverse: {
+          normal: "hsl(var(--reverse-normal))",
+          pokeball: "hsl(var(--reverse-pokeball))",
+          masterball: "hsl(var(--reverse-masterball))",
+        },
+        graded: "hsl(var(--graded))",
       },
       borderRadius: {
         lg: "var(--radius)",

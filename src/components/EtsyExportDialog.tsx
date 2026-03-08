@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ShoppingBag, Download, Loader2, CheckCircle2, Palette, Image as ImageIcon, Archive, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { ExportMode, SetDetail, Lang } from "@/lib/tcgdex-api";
-import { processCards } from "@/lib/tcgdex-api";
+import { processCards, fetchSetDetail } from "@/lib/tcgdex-api";
 import { toast } from "sonner";
 import { loadCardWithOverlays } from "@/lib/pdf-utils";
 import { generateEtsyVisual } from "@/lib/etsy-visual-generator";

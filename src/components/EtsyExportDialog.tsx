@@ -161,7 +161,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
               setProgress(pct * 0.3);
             });
 
-          setCurrentStep(`Génération du PDF (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
+          setCurrentStep(`${langLabel} — Génération PDF (${MODES.find(m => m.value === mode)?.label} — ${colorLabel})...`);
           const { jsPDF } = await import("jspdf");
 
           const cardsPerPage = 9;

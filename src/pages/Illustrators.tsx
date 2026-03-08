@@ -116,8 +116,10 @@ const Illustrators = () => {
         }
 
         const cardW = 63, cardH = 88;
+        const labelH = 10; // space for label below card
+        const totalCardH = cardH + labelH;
         const marginX = (210 - cardW * 3) / 2;
-        let x = marginX, y = 20, count = 0;
+        let x = marginX, y = 15, count = 0;
 
         for (let i = 0; i < chunk.length; i++) {
           const card = chunk[i];
@@ -143,15 +145,23 @@ const Illustrators = () => {
             }
           }
 
+          // Draw serie name + card number below the card
+          const labelText = `${card.serieName || ""} #${card.localId}`;
+          doc.setFontSize(7);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(100, 100, 100);
+          doc.text(labelText, x + cardW - 1, y + cardH + 4, { align: "right" });
+          doc.setTextColor(0, 0, 0);
+
           x += cardW;
           count++;
           if (count % 3 === 0) {
             x = marginX;
-            y += cardH;
+            y += totalCardH;
             if (count % 9 === 0 && count < chunk.length) {
               doc.addPage();
               x = marginX;
-              y = 20;
+              y = 15;
             }
           }
         }

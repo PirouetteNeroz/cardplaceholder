@@ -206,7 +206,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
                 .replace("_reverse_pokeball", "")
                 .replace("_reverse_masterball", "")
                 .replace("_reverse", "");
-              const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${localId}/high.png`;
+              const imgUrl = `https://assets.tcgdex.net/${pdfLang}/${langSetDetail.serie.id}/${langSetDetail.id}/${localId}/high.png`;
 
               try {
                 const dataUrl = await loadCardWithOverlays(imgUrl, {

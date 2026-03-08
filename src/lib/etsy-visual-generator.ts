@@ -249,8 +249,6 @@ export async function generateEtsyVisual(
   onProgress?.(55);
 
   // === Draw pages in collage layout - heavily overlapping like reference ===
-  const pageW = 280;
-  const pageH = 396;
   
   // Layer 1 (bottom): Graded pages in bottom-left corner, stacked
   drawPageOnCanvas(ctx, gradedPage, -60, 580, pageW * 0.95, pageH * 0.95, -12);

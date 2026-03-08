@@ -38,7 +38,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
   };
 
   const handleGenerate = async () => {
-    if (!illustratorName || cards.length === 0 || colorModes.length === 0) return;
+    if (!entityName || cards.length === 0 || colorModes.length === 0) return;
     setGenerating(true);
     setGeneratedFiles([]);
     const files: GeneratedFile[] = [];

@@ -248,29 +248,35 @@ export async function generateEtsyVisual(
 
   onProgress?.(55);
 
-  // === Draw pages in collage layout matching reference ===
-  // Grayscale - top right, slightly rotated
-  drawPageOnCanvas(ctx, grayscalePage, 640, -30, pageW * 0.85, pageH * 0.85, 5);
+  // === Draw pages in collage layout - heavily overlapping like reference ===
+  const pageW = 280;
+  const pageH = 396;
+  
+  // Layer 1 (bottom): Graded pages in bottom-left corner, stacked
+  drawPageOnCanvas(ctx, gradedPage, -60, 580, pageW * 0.95, pageH * 0.95, -12);
+  drawPageOnCanvas(ctx, gradedPage, 40, 520, pageW * 0.95, pageH * 0.95, -6);
+  drawPageOnCanvas(ctx, gradedPage, 140, 480, pageW * 0.9, pageH * 0.9, 2);
 
-  // Complete Set - center left, overlapping
-  drawPageOnCanvas(ctx, completePage, 120, 130, pageW, pageH, -3);
-
-  // Master Set - center, slightly behind
-  drawPageOnCanvas(ctx, masterPage, 330, 60, pageW * 0.95, pageH * 0.95, 2);
-
-  // Graded Set - bottom left
-  drawPageOnCanvas(ctx, gradedPage, -40, 450, pageW, pageH, -5);
-
-  // Another graded variation bottom
-  drawPageOnCanvas(ctx, gradedPage, 150, 550, pageW * 0.9, pageH * 0.9, 3);
+  // Layer 2: Complete Set - center-left, overlapping with graded
+  drawPageOnCanvas(ctx, completePage, 60, 180, pageW, pageH, -5);
+  
+  // Layer 3: Master Set - center, overlapping complete set
+  drawPageOnCanvas(ctx, masterPage, 280, 100, pageW, pageH, 3);
+  
+  // Layer 4: Grayscale - top right corner, overlapping others
+  drawPageOnCanvas(ctx, grayscalePage, 620, -50, pageW * 0.9, pageH * 0.9, 8);
+  
+  // Extra overlapping pages on right side for density
+  drawPageOnCanvas(ctx, completePage, 550, 350, pageW * 0.85, pageH * 0.85, 12);
+  drawPageOnCanvas(ctx, masterPage, 680, 500, pageW * 0.8, pageH * 0.8, -5);
 
   onProgress?.(65);
 
   // === Draw mode badges near their pages ===
-  drawBadge(ctx, "Grayscale", 780, 50, "#6b7280", 5);
-  drawBadge(ctx, "Complete Set", 220, 200, "#22c55e", -5);
-  drawBadge(ctx, "Master Set", 480, 140, "#3b82f6", 3);
-  drawBadge(ctx, "Graded Set", 100, 520, "#ef4444", -8);
+  drawBadge(ctx, "Graded Set", 80, 550, "#ef4444", -8);
+  drawBadge(ctx, "Complete Set", 180, 250, "#22c55e", -5);
+  drawBadge(ctx, "Master Set", 420, 170, "#3b82f6", 5);
+  drawBadge(ctx, "Grayscale", 760, 40, "#6b7280", 8);
 
   onProgress?.(70);
 

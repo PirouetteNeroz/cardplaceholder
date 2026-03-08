@@ -157,6 +157,13 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
     }
   }
 
+  // Filter out "Jeu de Cartes à Collectionner" / "Trading Card Game" series
+  const EXCLUDED_SERIES = ["jeu de cartes à collectionner", "trading card game", "sammelkartenspiel"];
+  filtered = filtered.filter((c) => {
+    const sn = (c.serieName || "").toLowerCase();
+    return !EXCLUDED_SERIES.some((ex) => sn.includes(ex));
+  });
+
   // Sort by release date, then by localId within same set
   filtered.sort((a, b) => {
     const dateA = a.releaseDate || "9999-12-31";

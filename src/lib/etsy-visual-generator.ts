@@ -364,7 +364,7 @@ export async function generateEtsyVisual(
       if (logoH > maxLogoH) { logoH = maxLogoH; logoW = logoH * logoAspect; }
 
       const logoX = SIZE / 2 - logoW / 2;
-      const logoY = 30;
+      const logoY = 65;
 
       // Multi-layer glow
       ctx.save();
@@ -372,7 +372,6 @@ export async function generateEtsyVisual(
       ctx.shadowBlur = 60;
       ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
       ctx.restore();
-      // Second glow pass for richness
       ctx.save();
       ctx.shadowColor = grad.mid;
       ctx.shadowBlur = 80;

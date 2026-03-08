@@ -25,17 +25,29 @@ interface GeneratedFile {
   blob: Blob;
 }
 
+const AVAILABLE_LANGS: { value: Lang; label: string }[] = [
+  { value: "fr", label: "🇫🇷 FR" },
+  { value: "en", label: "🇬🇧 EN" },
+  { value: "de", label: "🇩🇪 DE" },
+  { value: "es", label: "🇪🇸 ES" },
+  { value: "it", label: "🇮🇹 IT" },
+  { value: "pt", label: "🇵🇹 PT" },
+  { value: "ja", label: "🇯🇵 JA" },
+];
+
 interface Props {
   entityName: string | null;
   entityLabel?: string;
   cards: CardListItem[];
   lang: Lang;
   disabled?: boolean;
+  fetchCardsForLang?: (lang: Lang) => Promise<CardListItem[]>;
 }
 
-export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur", cards, lang, disabled }: Props) {
+export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur", cards, lang, disabled, fetchCardsForLang }: Props) {
   const [open, setOpen] = useState(false);
   const [colorModes, setColorModes] = useState<("color" | "grayscale")[]>(["color"]);
+  const [selectedPdfLangs, setSelectedPdfLangs] = useState<Lang[]>([lang]);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState("");
@@ -43,6 +55,12 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
   const [maxPagesPerPDF, setMaxPagesPerPDF] = useState(15);
   const [includePromoVisual, setIncludePromoVisual] = useState(true);
   const [bgColor, setBgColor] = useState("#e91e8c");
+
+  const togglePdfLang = (l: Lang) => {
+    setSelectedPdfLangs((prev) =>
+      prev.includes(l) ? (prev.length > 1 ? prev.filter((x) => x !== l) : prev) : [...prev, l]
+    );
+  };
 
   const toggleColorMode = (cm: "color" | "grayscale") => {
     setColorModes((prev) =>

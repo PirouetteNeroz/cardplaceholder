@@ -268,41 +268,39 @@ export async function generateEtsyVisual(
 
   onProgress?.(68);
 
-  // === STYLED HEADER: "Download, Print, Cut" with decorative background ===
+  // === STYLED HEADER: "Download, Print, Cut" ===
   ctx.save();
-  // Dark ribbon behind text
-  const ribbonH = 60;
-  const ribbonY = 20;
-  roundRect(ctx, 20, ribbonY, 480, ribbonH, 12);
-  ctx.fillStyle = "rgba(0,0,0,0.75)";
+  const ribbonH = 58;
+  const ribbonY = 18;
+  roundRect(ctx, 18, ribbonY, 470, ribbonH, 12);
+  ctx.fillStyle = "rgba(0,0,0,0.78)";
   ctx.fill();
-  // Text
   ctx.fillStyle = "#fff";
-  ctx.font = "bold 40px Arial, sans-serif";
+  ctx.font = "bold 38px Arial, sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText("Download, Print, Cut", 42, ribbonY + ribbonH / 2);
+  ctx.fillText("Download, Print, Cut", 38, ribbonY + ribbonH / 2);
   ctx.restore();
 
-  // === FLAGS (inside ribbon, right side) ===
-  const flagSize = 38;
-  const flagGap = 8;
-  let flagX = 520;
-  const flagY = ribbonY + (ribbonH - flagSize * 0.67) / 2;
+  // === FLAGS (below ribbon) ===
+  const flagSize = 48;
+  const flagGap = 10;
+  let flagX = 22;
+  const flagY = ribbonY + ribbonH + 10;
 
   for (const l of langs) {
     try {
       const flagImg = await loadImage(FLAG_URLS[l]);
       const fh = flagSize * 0.67;
       ctx.save();
-      roundRect(ctx, flagX, flagY, flagSize, fh, 4);
+      roundRect(ctx, flagX, flagY, flagSize, fh, 5);
       ctx.clip();
       ctx.drawImage(flagImg, flagX, flagY, flagSize, fh);
       ctx.restore();
       ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
       ctx.lineWidth = 1.5;
-      roundRect(ctx, flagX, flagY, flagSize, fh, 4);
+      roundRect(ctx, flagX, flagY, flagSize, fh, 5);
       ctx.stroke();
       ctx.restore();
     } catch { /* skip */ }
@@ -311,35 +309,35 @@ export async function generateEtsyVisual(
 
   onProgress?.(72);
 
-  // === DIAGONAL CASCADE: bottom-left to top-right, ALL STRAIGHT (rot=0) ===
+  // === DIAGONAL CASCADE: bottom-left to top-right, STRAIGHT, LARGE ===
   const pages = [gradedPage, completePage, masterPage, grayscalePage];
   const labels = ["Graded Set", "Complete Set", "Master Set", "Grayscale"];
   const colors = ["#ef4444", "#f97316", "#3b82f6", "#8b5cf6"];
 
   const pageConfigs = [
-    { w: 400, h: 565, x: -15, y: 430, rot: 0 },    // Graded - bottom-left
-    { w: 360, h: 509, x: 190, y: 290, rot: 0 },     // Complete
-    { w: 340, h: 480, x: 410, y: 170, rot: 0 },     // Master
-    { w: 340, h: 480, x: 650, y: 70, rot: 0 },      // Grayscale - top-right
+    { w: 460, h: 640, x: -40, y: 400, rot: 0 },     // Graded - bottom-left, biggest
+    { w: 420, h: 585, x: 175, y: 260, rot: 0 },      // Complete
+    { w: 390, h: 543, x: 400, y: 140, rot: 0 },      // Master
+    { w: 390, h: 543, x: 630, y: 40, rot: 0 },       // Grayscale - top-right
   ];
 
-  // Draw pages back to front (rightmost first so left overlaps)
+  // Draw pages back to front
   for (let i = pages.length - 1; i >= 0; i--) {
     const c = pageConfigs[i];
     drawPageOnCanvas(ctx, pages[i], c.x, c.y, c.w, c.h, c.rot);
   }
 
-  // Draw badges ON TOP of all pages
+  // Draw badges ON TOP
   for (let i = 0; i < pages.length; i++) {
     const c = pageConfigs[i];
     const badgeCx = c.x + c.w / 2;
-    const badgeCy = c.y + 28;
+    const badgeCy = c.y + 26;
     drawBadge(ctx, labels[i], badgeCx, badgeCy, colors[i], 0);
   }
 
   onProgress?.(80);
 
-  // === LOGO (centered, ON TOP of pages, VERY large) ===
+  // === LOGO (centered, ON TOP, HUGE) ===
   const logoUrl = customLogoUrl && customLogoUrl.trim() !== "" ? customLogoUrl.trim() : setDetail.logo;
   let logoImg: HTMLImageElement | null = null;
   if (logoUrl) {
@@ -347,21 +345,20 @@ export async function generateEtsyVisual(
   }
 
   if (logoImg) {
-    const maxLogoW = 750;
-    const maxLogoH = 300;
+    const maxLogoW = 850;
+    const maxLogoH = 340;
     const logoAspect = logoImg.width / logoImg.height;
     let logoW = maxLogoW;
     let logoH = logoW / logoAspect;
     if (logoH > maxLogoH) { logoH = maxLogoH; logoW = logoH * logoAspect; }
 
     const logoX = SIZE / 2 - logoW / 2;
-    const logoY = SIZE / 2 - logoH / 2 + 80;
+    const logoY = SIZE / 2 - logoH / 2 + 60;
 
-    // Strong multi-layer shadow
     ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
-    ctx.shadowBlur = 50;
-    ctx.shadowOffsetY = 10;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.85)";
+    ctx.shadowBlur = 60;
+    ctx.shadowOffsetY = 12;
     ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
     ctx.restore();
     ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
@@ -369,9 +366,8 @@ export async function generateEtsyVisual(
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
     ctx.shadowBlur = 20;
-    ctx.shadowOffsetY = 4;
     ctx.fillStyle = "#000";
-    ctx.font = "bold 80px Arial, sans-serif";
+    ctx.font = "bold 86px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(setDetail.name, SIZE / 2, SIZE / 2 + 60);
@@ -380,14 +376,13 @@ export async function generateEtsyVisual(
 
   onProgress?.(88);
 
-  // === BOTTOM CTA: styled "✨ Download ✨" button ===
+  // === BOTTOM CTA ===
   ctx.save();
   const btnW = 480;
   const btnH = 70;
   const btnX = SIZE / 2 - btnW / 2;
   const btnY = SIZE - 100;
 
-  // Button shadow
   ctx.shadowColor = "rgba(0,0,0,0.4)";
   ctx.shadowBlur = 20;
   ctx.shadowOffsetY = 6;
@@ -396,7 +391,6 @@ export async function generateEtsyVisual(
   ctx.fill();
   ctx.shadowColor = "transparent";
 
-  // Button text
   ctx.fillStyle = "#fff";
   ctx.font = "bold 42px Arial, sans-serif";
   ctx.textAlign = "center";

@@ -1,4 +1,5 @@
 import type { SetDetail, Lang } from "@/lib/tcgdex-api";
+import { fetchSeriesDetail } from "@/lib/tcgdex-api";
 
 const SIZE = 1080;
 
@@ -210,15 +211,42 @@ export async function generateEtsyVisual(
     ctx.restore();
   }
 
-  // === Series name below logo ===
-  ctx.save();
-  ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
-  ctx.shadowBlur = 8;
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 28px Arial, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(setDetail.serie.name, SIZE / 2, 280);
-  ctx.restore();
+  // === Series logo below set logo ===
+  let serieLogoImg: HTMLImageElement | null = null;
+  try {
+    const serieDetail = await fetchSeriesDetail(lang, setDetail.serie.id);
+    if (serieDetail.logo) {
+      serieLogoImg = await loadImage(serieDetail.logo);
+    }
+  } catch {
+    // skip
+  }
+
+  if (serieLogoImg) {
+    const maxSerieW = 300;
+    const maxSerieH = 80;
+    const serieAspect = serieLogoImg.width / serieLogoImg.height;
+    let serieW = maxSerieW;
+    let serieH = serieW / serieAspect;
+    if (serieH > maxSerieH) {
+      serieH = maxSerieH;
+      serieW = serieH * serieAspect;
+    }
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+    ctx.shadowBlur = 10;
+    ctx.drawImage(serieLogoImg, SIZE / 2 - serieW / 2, 270, serieW, serieH);
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 28px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(setDetail.serie.name, SIZE / 2, 280);
+    ctx.restore();
+  }
 
   // === Set name if logo exists ===
   if (logoImg) {

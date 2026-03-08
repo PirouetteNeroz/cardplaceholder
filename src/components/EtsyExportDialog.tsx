@@ -110,6 +110,97 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
     );
   };
 
+  const togglePngMode = (mode: ExportMode) => {
+    setPngModes((prev) =>
+      prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode]
+    );
+  };
+
+  const togglePngLang = (l: Lang) => {
+    setPngLangs((prev) =>
+      prev.includes(l) ? (prev.length > 1 ? prev.filter((x) => x !== l) : prev) : [...prev, l]
+    );
+  };
+
+  const togglePngColorMode = (cm: "color" | "grayscale") => {
+    setPngColorModes((prev) =>
+      prev.includes(cm) ? prev.filter((c) => c !== cm) : [...prev, cm]
+    );
+  };
+
+  const handleGeneratePng = async () => {
+    if (!setDetail || pngModes.length === 0 || pngLangs.length === 0 || pngColorModes.length === 0) return;
+    setGeneratingPng(true);
+    setPngProgress(0);
+    const pngFiles: GeneratedFile[] = [];
+    const totalJobs = pngModes.length * pngLangs.length * pngColorModes.length;
+    let jobDone = 0;
+
+    for (const pngLang of pngLangs) {
+      let langSet: SetDetail;
+      try {
+        langSet = await fetchSetDetail(pngLang, setDetail.id);
+      } catch {
+        toast.error(`Impossible de charger le set en ${pngLang.toUpperCase()}`);
+        continue;
+      }
+
+      for (const mode of pngModes) {
+        const modeLabel = MODES.find((m) => m.value === mode)?.label || mode;
+        setPngStep(`${pngLang.toUpperCase()} — ${modeLabel} — Traitement cartes...`);
+
+        let cards;
+        try {
+          cards = await processCards(pngLang, langSet, mode);
+        } catch {
+          toast.error(`Erreur traitement ${modeLabel}`);
+          continue;
+        }
+
+        const totalPages = getTotalPages(cards.length);
+        const pageIdx = Math.min(pngPage - 1, totalPages - 1);
+
+        for (const cm of pngColorModes) {
+          const isGray = cm === "grayscale";
+          const colorLabel = isGray ? "N&B" : "Couleur";
+          setPngStep(`${pngLang.toUpperCase()} — ${modeLabel} — ${colorLabel} — Page ${pageIdx + 1}...`);
+
+          try {
+            const blob = await renderPageAsPng(
+              cards,
+              pageIdx,
+              pngLang,
+              langSet,
+              { grayscale: isGray },
+              (pct) => setPngProgress(((jobDone + pct / 100) / totalJobs) * 100)
+            );
+            if (blob) {
+              const langSuffix = pngLangs.length > 1 ? `_${pngLang}` : "";
+              const colorSuffix = isGray ? "_nb" : "";
+              pngFiles.push({
+                name: `${langSet.name}${langSuffix}_${mode}${colorSuffix}_page${pageIdx + 1}.png`,
+                mode,
+                blob,
+                type: "image",
+              });
+            }
+          } catch (e) {
+            console.error(e);
+          }
+          jobDone++;
+          setPngProgress((jobDone / totalJobs) * 100);
+        }
+      }
+    }
+
+    if (pngFiles.length > 0) {
+      setGeneratedFiles((prev) => [...prev, ...pngFiles]);
+      toast.success(`${pngFiles.length} PNG(s) générés !`);
+    }
+    setGeneratingPng(false);
+    setPngStep("");
+  };
+
   const handleGenerateVisual = async () => {
     if (!setDetail) return;
     setGeneratingVisual(true);

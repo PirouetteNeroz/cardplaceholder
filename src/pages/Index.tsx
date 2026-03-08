@@ -12,6 +12,8 @@ import {
   type SetDetail, type ProcessedCard, type CardItem,
   SPECIAL_RARITIES,
 } from "@/lib/tcgdex-api";
+import { PdfProgressDialog } from "@/components/PdfProgressDialog";
+import { EtsyExportDialog } from "@/components/EtsyExportDialog";
 import { Loader2, Download, BookOpen, Layers } from "lucide-react";
 import { toast } from "sonner";
 

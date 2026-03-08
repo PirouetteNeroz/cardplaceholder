@@ -302,10 +302,10 @@ export async function generateEtsyVisual(
   onProgress?.(68);
 
   // === LOGO (top, centered, large) ===
-  const logoUrl = customLogoUrl || setDetail.logo;
+  const logoUrl = customLogoUrl && customLogoUrl.trim() !== "" ? customLogoUrl.trim() : setDetail.logo;
   let logoImg: HTMLImageElement | null = null;
   if (logoUrl) {
-    try { logoImg = await loadImage(logoUrl); } catch { /* skip */ }
+    try { logoImg = await loadImage(logoUrl); } catch (e) { console.warn("Logo load failed:", logoUrl, e); }
   }
 
   const logoBottomY = (() => {

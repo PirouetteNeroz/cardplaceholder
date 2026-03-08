@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { SeriesList } from "@/components/SeriesList";
 import { SetsList } from "@/components/SetsList";
@@ -50,6 +52,7 @@ const Index = () => {
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfProgress, setPdfProgress] = useState(0);
   const [pdfStep, setPdfStep] = useState("");
+  const [maxPagesPerPDF, setMaxPagesPerPDF] = useState(6);
 
   const handleLoadSeries = useCallback(async () => {
     setLoading(true);
@@ -115,8 +118,7 @@ const Index = () => {
     try {
       const { jsPDF } = await import("jspdf");
       const cardsPerPage = 9;
-      const maxPagesPerPDF = 6;
-      const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF; // 54
+      const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF;
       const totalParts = Math.ceil(processedCards.length / maxCardsPerPDF);
 
       for (let part = 0; part < totalParts; part++) {
@@ -197,7 +199,7 @@ const Index = () => {
       console.error(e);
     }
     setTimeout(() => setPdfGenerating(false), 800);
-  }, [setDetail, processedCards, lang, mode]);
+  }, [setDetail, processedCards, lang, mode, maxPagesPerPDF]);
 
   // Derive table data
   const reverseCards = processedCards.filter(c => c.reverse && !c.reverseType);
@@ -238,6 +240,18 @@ const Index = () => {
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Charger les séries
             </Button>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="maxPages" className="text-xs text-muted-foreground whitespace-nowrap">Pages max/PDF</Label>
+              <Input
+                id="maxPages"
+                type="number"
+                min={1}
+                max={50}
+                value={maxPagesPerPDF}
+                onChange={(e) => setMaxPagesPerPDF(Math.max(1, parseInt(e.target.value) || 6))}
+                className="w-[70px] h-9"
+              />
+            </div>
             <Button variant="outline" onClick={handleExportPDF} disabled={processedCards.length === 0}>
               <Download className="mr-2 h-4 w-4" />
               PDF

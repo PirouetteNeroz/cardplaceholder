@@ -46,6 +46,9 @@ const Index = () => {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [view, setView] = useState<"grid" | "table">("grid");
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState(0);
+  const [pdfStep, setPdfStep] = useState("");
 
   const handleLoadSeries = useCallback(async () => {
     setLoading(true);

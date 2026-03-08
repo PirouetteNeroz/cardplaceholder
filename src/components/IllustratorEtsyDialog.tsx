@@ -42,7 +42,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
   const [maxPagesPerPDF, setMaxPagesPerPDF] = useState(15);
   const [includePromoVisual, setIncludePromoVisual] = useState(true);
-  const [bgColor, setBgColor] = useState("#2d1b69");
+  const [bgColor, setBgColor] = useState("#e91e8c");
 
   const toggleColorMode = (cm: "color" | "grayscale") => {
     setColorModes((prev) =>

@@ -115,8 +115,20 @@ export async function generateEtsyVisual(
 
   onProgress?.(10);
 
+  // === Load set logo ===
+  let logoImg: HTMLImageElement | null = null;
+  if (setDetail.logo) {
+    try {
+      logoImg = await loadImage(setDetail.logo);
+    } catch {
+      // skip logo
+    }
+  }
+
+  onProgress?.(15);
+
   // === Load sample card images ===
-  const sampleCards = setDetail.cards.slice(0, 9);
+  const sampleCards = setDetail.cards.slice(0, 8);
   const cardImages: (HTMLImageElement | null)[] = [];
 
   for (let i = 0; i < sampleCards.length; i++) {
@@ -128,166 +140,110 @@ export async function generateEtsyVisual(
     } catch {
       cardImages.push(null);
     }
-    onProgress?.(10 + ((i + 1) / sampleCards.length) * 50);
+    onProgress?.(15 + ((i + 1) / sampleCards.length) * 45);
   }
 
-  // === Draw cards in a fan/scattered layout ===
-  const cardW = 180;
-  const cardH = 252;
+  const fanCards = cardImages.filter(Boolean) as HTMLImageElement[];
+  const cardW = 150;
+  const cardH = 210;
 
-  // Main featured cards (fan arrangement in center)
-  const fanCards = cardImages.filter(Boolean).slice(0, 7) as HTMLImageElement[];
-  const centerX = SIZE / 2;
-  const centerY = SIZE / 2 + 20;
-
-  // Background cards (smaller, faded)
-  if (fanCards.length > 4) {
-    ctx.globalAlpha = 0.3;
-    const bgPositions = [
-      { x: 50, y: 100, r: -15, s: 0.7 },
-      { x: 830, y: 80, r: 12, s: 0.7 },
-      { x: 850, y: 550, r: 8, s: 0.65 },
-      { x: 30, y: 580, r: -10, s: 0.65 },
-    ];
-    bgPositions.forEach((pos, i) => {
-      if (fanCards[3 + i]) {
-        drawCardWithShadow(ctx, fanCards[3 + i], pos.x, pos.y, cardW * pos.s, cardH * pos.s, pos.r);
-      }
-    });
-    ctx.globalAlpha = 1;
-  }
-
-  // Main fan of 3-4 cards
-  const mainPositions = [
-    { x: centerX - cardW - 60, y: centerY - cardH / 2 + 30, r: -8 },
-    { x: centerX - cardW / 2, y: centerY - cardH / 2 - 10, r: 0 },
-    { x: centerX + 60, y: centerY - cardH / 2 + 30, r: 8 },
+  // === Draw scattered background cards (corners) ===
+  const cornerPositions = [
+    { x: -20, y: -10, r: -18, s: 0.9 },
+    { x: SIZE - cardW * 0.9 + 20, y: -10, r: 15, s: 0.9 },
+    { x: -20, y: SIZE - cardH * 0.85 - 40, r: 12, s: 0.85 },
+    { x: SIZE - cardW * 0.85 + 20, y: SIZE - cardH * 0.85 - 40, r: -10, s: 0.85 },
+    { x: SIZE / 2 - cardW * 0.7 / 2 - 280, y: SIZE / 2 - cardH * 0.7 / 2 + 20, r: -6, s: 0.7 },
+    { x: SIZE / 2 - cardW * 0.7 / 2 + 280, y: SIZE / 2 - cardH * 0.7 / 2 + 20, r: 6, s: 0.7 },
   ];
 
-  mainPositions.forEach((pos, i) => {
+  ctx.globalAlpha = 0.35;
+  cornerPositions.forEach((pos, i) => {
     if (fanCards[i]) {
-      drawCardWithShadow(ctx, fanCards[i], pos.x, pos.y, cardW, cardH, pos.r);
+      drawCardWithShadow(ctx, fanCards[i], pos.x, pos.y, cardW * pos.s, cardH * pos.s, pos.r);
     }
   });
+  ctx.globalAlpha = 1;
+
+  // === Two main cards flanking the logo ===
+  if (fanCards[0]) {
+    drawCardWithShadow(ctx, fanCards[0], SIZE / 2 - 290, SIZE / 2 - cardH / 2 + 30, cardW, cardH, -7);
+  }
+  if (fanCards[1]) {
+    drawCardWithShadow(ctx, fanCards[1], SIZE / 2 + 140, SIZE / 2 - cardH / 2 + 30, cardW, cardH, 7);
+  }
 
   onProgress?.(70);
 
-  // === Grayscale mini preview (top right) ===
-  if (fanCards[0]) {
-    const grayW = 140;
-    const grayH = 196;
-    const grayX = SIZE - grayW - 60;
-    const grayY = 60;
-
-    // Create grayscale version
-    const tmpCanvas = document.createElement("canvas");
-    tmpCanvas.width = fanCards[0].width;
-    tmpCanvas.height = fanCards[0].height;
-    const tmpCtx = tmpCanvas.getContext("2d")!;
-    tmpCtx.drawImage(fanCards[0], 0, 0);
-    const imageData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
-    const data = imageData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      data[i] = gray;
-      data[i + 1] = gray;
-      data[i + 2] = gray;
+  // === Set logo (large, centered) ===
+  if (logoImg) {
+    const maxLogoW = 420;
+    const maxLogoH = 200;
+    const logoAspect = logoImg.width / logoImg.height;
+    let logoW = maxLogoW;
+    let logoH = logoW / logoAspect;
+    if (logoH > maxLogoH) {
+      logoH = maxLogoH;
+      logoW = logoH * logoAspect;
     }
-    tmpCtx.putImageData(imageData, 0, 0);
-    const grayImg = await loadImage(tmpCanvas.toDataURL());
-    drawCardWithShadow(ctx, grayImg, grayX, grayY, grayW, grayH, 5);
 
-    // "Grayscale" badge
+    // Glow behind logo
     ctx.save();
-    const badgeX = grayX + grayW / 2;
-    const badgeY = grayY - 5;
-    ctx.translate(badgeX, badgeY);
-    ctx.rotate(5 * Math.PI / 180);
-    roundRect(ctx, -55, -14, 110, 28, 14);
-    ctx.fillStyle = "#8B5CF6";
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 14px Arial, sans-serif";
+    ctx.shadowColor = "rgba(255, 215, 0, 0.5)";
+    ctx.shadowBlur = 40;
+    ctx.drawImage(logoImg, SIZE / 2 - logoW / 2, 60, logoW, logoH);
+    ctx.restore();
+
+    // Draw logo again crisp on top
+    ctx.drawImage(logoImg, SIZE / 2 - logoW / 2, 60, logoW, logoH);
+  } else {
+    // Fallback: text title
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 3;
+    ctx.fillStyle = "#FFD700";
+    ctx.font = "bold 56px Arial, sans-serif";
     ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Grayscale", 0, 0);
+    ctx.textBaseline = "top";
+    ctx.fillText(setDetail.name, SIZE / 2, 80);
+    ctx.restore();
+  }
+
+  // === Series name below logo ===
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 28px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(setDetail.serie.name, SIZE / 2, 280);
+  ctx.restore();
+
+  // === Set name if logo exists ===
+  if (logoImg) {
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = "#FFD700";
+    ctx.font = "bold 40px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(setDetail.name, SIZE / 2, 315);
     ctx.restore();
   }
 
   onProgress?.(80);
 
-  // === Set name (top center) ===
-  ctx.save();
-  // Text shadow
-  ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
-  ctx.shadowBlur = 10;
-  ctx.shadowOffsetY = 3;
-
-  ctx.fillStyle = "#FFD700";
-  ctx.font = "bold 52px Arial, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillText(setDetail.name, SIZE / 2, 30);
-
-  // Series name
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 26px Arial, sans-serif";
-  ctx.fillText(setDetail.serie.name, SIZE / 2, 90);
-  ctx.restore();
-
-  // === Mode badges ===
-  const badgeStartY = SIZE - 200;
-  const badgeSpacing = 42;
-  MODE_BADGES.forEach((badge, i) => {
-    const bx = SIZE / 2;
-    const by = badgeStartY + i * badgeSpacing;
-    const textWidth = ctx.measureText(badge.label).width || badge.label.length * 12;
-    const bw = Math.max(textWidth + 40, 180);
-
-    roundRect(ctx, bx - bw / 2, by - 15, bw, 32, 16);
-    ctx.fillStyle = badge.color;
-    ctx.fill();
-
-    // White border
-    ctx.strokeStyle = "rgba(255,255,255,0.3)";
-    ctx.lineWidth = 1.5;
-    roundRect(ctx, bx - bw / 2, by - 15, bw, 32, 16);
-    ctx.stroke();
-
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 16px Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(badge.label, bx, by + 1);
-  });
-
-  // === "Download, Print, Cut" text ===
-  ctx.save();
-  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-  ctx.shadowBlur = 8;
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 28px Arial, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Download, Print, Cut", SIZE / 2, SIZE - 60);
-  ctx.restore();
-
-  // === "Color & Grayscale" subtitle ===
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.font = "18px Arial, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Color & Grayscale", SIZE / 2, SIZE - 32);
-
   // === Language flags ===
-  const flagSize = 32;
-  const flagGap = 10;
+  const flagSize = 36;
+  const flagGap = 12;
   const totalFlagsW = langs.length * flagSize + (langs.length - 1) * flagGap;
   let flagX = SIZE / 2 - totalFlagsW / 2;
-  const flagY = 125;
+  const flagY = 370;
 
   for (const l of langs) {
     try {
       const flagImg = await loadImage(FLAG_URLS[l]);
-      // Draw circular flag
       ctx.save();
       ctx.beginPath();
       ctx.arc(flagX + flagSize / 2, flagY + flagSize / 2, flagSize / 2, 0, Math.PI * 2);
@@ -295,17 +251,57 @@ export async function generateEtsyVisual(
       ctx.drawImage(flagImg, flagX, flagY, flagSize, flagSize);
       ctx.restore();
 
-      // Flag border
       ctx.beginPath();
       ctx.arc(flagX + flagSize / 2, flagY + flagSize / 2, flagSize / 2, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(255,255,255,0.5)";
       ctx.lineWidth = 2;
       ctx.stroke();
     } catch {
-      // skip flag
+      // skip
     }
     flagX += flagSize + flagGap;
   }
+
+  // === Mode badges (bottom area) ===
+  const badgeStartY = SIZE - 220;
+  const badgeSpacing = 44;
+  MODE_BADGES.forEach((badge, i) => {
+    const bx = SIZE / 2;
+    const by = badgeStartY + i * badgeSpacing;
+    ctx.font = "bold 18px Arial, sans-serif";
+    const textWidth = ctx.measureText(badge.label).width;
+    const bw = Math.max(textWidth + 50, 200);
+
+    roundRect(ctx, bx - bw / 2, by - 17, bw, 36, 18);
+    ctx.fillStyle = badge.color;
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, bx - bw / 2, by - 17, bw, 36, 18);
+    ctx.stroke();
+
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(badge.label, bx, by + 1);
+  });
+
+  // === "Download, Print, Cut" ===
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 30px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Download, Print, Cut", SIZE / 2, SIZE - 60);
+  ctx.restore();
+
+  // === "Color & Grayscale" ===
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = "20px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Color & Grayscale", SIZE / 2, SIZE - 30);
 
   onProgress?.(95);
 

@@ -16,7 +16,9 @@ import {
 } from "@/lib/tcgdex-api";
 import { PdfProgressDialog } from "@/components/PdfProgressDialog";
 import { EtsyExportDialog } from "@/components/EtsyExportDialog";
-import { Loader2, Download, BookOpen, Layers } from "lucide-react";
+import { Loader2, Download, BookOpen, Layers, Paintbrush } from "lucide-react";
+import { toast } from "sonner";
+import { NavLink } from "@/components/NavLink";
 import { toast } from "sonner";
 import { loadCardWithOverlays } from "@/lib/pdf-utils";
 

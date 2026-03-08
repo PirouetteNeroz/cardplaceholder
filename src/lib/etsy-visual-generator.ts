@@ -400,14 +400,14 @@ export async function generateEtsyVisual(
 
   onProgress?.(76);
 
-  // === STAGGERED CASCADE: 4 large pages, dramatic overlap ===
-  const pageW = 360;
-  const pageH = 508;
+  // === STAGGERED CASCADE: 4 tall pages, nearly straight ===
+  const pageW = 310;
+  const pageH = 560;
   const fanCenterX = SIZE / 2;
-  const fanBaseY = logoBottomY + 15;
-  const spacing = 175;
-  const verticalStep = 40;
-  const rotations = [-11, -3.5, 3.5, 11];
+  const fanBaseY = logoBottomY + 5;
+  const spacing = 180;
+  const verticalStep = 22;
+  const rotations = [-1.5, -0.5, 0.5, 1.5];
   const pages = [gradedPage, completePage, masterPage, grayscalePage];
   const labels = ["Graded Set", "Complete Set", "Master Set", "Grayscale"];
   const colors = ["#ef4444", "#f97316", "#3b82f6", "#8b5cf6"];

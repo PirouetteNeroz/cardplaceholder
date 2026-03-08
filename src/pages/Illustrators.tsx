@@ -97,7 +97,8 @@ const Illustrators = () => {
               Charger les illustrateurs
             </Button>
             <IllustratorEtsyDialog
-              illustratorName={selectedIllustrator}
+              entityName={selectedIllustrator}
+              entityLabel="Illustrateur"
               cards={cards}
               lang={lang}
               disabled={cards.length === 0}

@@ -230,7 +230,7 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
         <DialogHeader>
           <DialogTitle className="font-display flex items-center gap-2">
             <ShoppingBag className="h-5 w-5 text-primary" />
-            Export Etsy — {illustratorName || "Illustrateur"}
+            Export Etsy — {entityName || entityLabel}
           </DialogTitle>
         </DialogHeader>
 

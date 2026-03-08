@@ -58,74 +58,88 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
 
       try {
         const cards = await processCards(lang, setDetail, mode, (pct) => {
-          setProgress(pct * 0.5); // 0-50% for card processing
+          setProgress(pct * 0.3);
         });
 
         setCurrentStep(`Génération du PDF (${MODES.find(m => m.value === mode)?.label})...`);
         const { jsPDF } = await import("jspdf");
-        const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-        // Cover page
-        doc.setFontSize(32);
-        doc.setFont("helvetica", "bold");
-        doc.text(setDetail.name, 105, 60, { align: "center" });
-        doc.setFontSize(18);
-        doc.setFont("helvetica", "normal");
-        doc.text("Collection Pokémon", 105, 75, { align: "center" });
-        doc.setFontSize(14);
-        doc.text(`Série: ${setDetail.serie.name}`, 30, 200);
-        doc.text(`Mode: ${MODES.find(m => m.value === mode)?.label}`, 30, 210);
-        doc.text(`Cartes: ${cards.length}`, 30, 220);
-        doc.text(`Langue: ${lang.toUpperCase()}`, 30, 230);
-        doc.addPage();
+        const cardsPerPage = 9;
+        const maxPagesPerPDF = 6;
+        const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF;
+        const totalParts = Math.ceil(cards.length / maxCardsPerPDF);
 
-        // Cards
-        const cardW = 63, cardH = 88;
-        const marginX = (210 - cardW * 3) / 2;
-        let x = marginX, y = 20, count = 0;
+        for (let part = 0; part < totalParts; part++) {
+          const startIdx = part * maxCardsPerPDF;
+          const endIdx = Math.min(startIdx + maxCardsPerPDF, cards.length);
+          const chunk = cards.slice(startIdx, endIdx);
 
-        for (let ci = 0; ci < cards.length; ci++) {
-          const card = cards[ci];
-          let localId = card.localId
-            .replace("_reverse_pokeball", "")
-            .replace("_reverse_masterball", "")
-            .replace("_reverse", "");
-          const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${localId}/high.png`;
+          const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-          try {
-            const dataUrl = await loadCardWithOverlays(imgUrl, {
-              reverse: card.reverse,
-              reverseType: card.reverseType,
-              graded: card.graded,
-            });
-            if (dataUrl) {
-              doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
+          // Cover page
+          doc.setFontSize(32);
+          doc.setFont("helvetica", "bold");
+          doc.text(setDetail.name, 105, 60, { align: "center" });
+          doc.setFontSize(18);
+          doc.setFont("helvetica", "normal");
+          doc.text("Collection Pokémon", 105, 75, { align: "center" });
+          doc.setFontSize(14);
+          doc.text(`Série: ${setDetail.serie.name}`, 30, 200);
+          doc.text(`Mode: ${MODES.find(m => m.value === mode)?.label}`, 30, 210);
+          doc.text(`Cartes: ${cards.length}`, 30, 220);
+          doc.text(`Langue: ${lang.toUpperCase()}`, 30, 230);
+          if (totalParts > 1) doc.text(`Partie ${part + 1} / ${totalParts}`, 30, 240);
+          doc.addPage();
+
+          const cardW = 63, cardH = 88;
+          const marginX = (210 - cardW * 3) / 2;
+          let x = marginX, y = 20, count = 0;
+
+          for (let ci = 0; ci < chunk.length; ci++) {
+            const card = chunk[ci];
+            let localId = card.localId
+              .replace("_reverse_pokeball", "")
+              .replace("_reverse_masterball", "")
+              .replace("_reverse", "");
+            const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${localId}/high.png`;
+
+            try {
+              const dataUrl = await loadCardWithOverlays(imgUrl, {
+                reverse: card.reverse,
+                reverseType: card.reverseType,
+                graded: card.graded,
+              });
+              if (dataUrl) {
+                doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
+              }
+            } catch {
+              // skip
             }
-          } catch {
-            // skip
-          }
 
-          x += cardW;
-          count++;
-          if (count % 3 === 0) {
-            x = marginX;
-            y += cardH;
-            if (count % 9 === 0 && count < cards.length) {
-              doc.addPage();
+            x += cardW;
+            count++;
+            if (count % 3 === 0) {
               x = marginX;
-              y = 20;
+              y += cardH;
+              if (count % 9 === 0 && count < chunk.length) {
+                doc.addPage();
+                x = marginX;
+                y = 20;
+              }
             }
+
+            const globalProgress = (startIdx + ci + 1) / cards.length;
+            setProgress(30 + globalProgress * 70);
           }
 
-          setProgress(50 + ((ci + 1) / cards.length) * 50);
+          const suffix = totalParts > 1 ? `_part${part + 1}` : "";
+          const pdfBlob = doc.output("blob");
+          files.push({
+            name: `${setDetail.name}_${mode}${suffix}.pdf`,
+            mode,
+            blob: pdfBlob,
+          });
         }
-
-        const pdfBlob = doc.output("blob");
-        files.push({
-          name: `${setDetail.name}_${mode}.pdf`,
-          mode,
-          blob: pdfBlob,
-        });
       } catch (e) {
         console.error(e);
         toast.error(`Erreur pour le mode ${mode}`);

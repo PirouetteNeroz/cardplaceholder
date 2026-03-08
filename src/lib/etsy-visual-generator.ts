@@ -284,36 +284,41 @@ export async function generateEtsyVisual(
 
   onProgress?.(68);
 
-  // === "Download, Print, Cut" text top-left ===
+  // === STYLED HEADER: "Download, Print, Cut" with decorative background ===
   ctx.save();
-  ctx.fillStyle = "#000";
-  ctx.font = "bold 52px Arial, sans-serif";
+  // Dark ribbon behind text
+  const ribbonH = 60;
+  const ribbonY = 20;
+  roundRect(ctx, 20, ribbonY, 480, ribbonH, 12);
+  ctx.fillStyle = "rgba(0,0,0,0.75)";
+  ctx.fill();
+  // Text
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 40px Arial, sans-serif";
   ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  ctx.fillText("Download, Print, Cut", 30, 28);
+  ctx.textBaseline = "middle";
+  ctx.fillText("Download, Print, Cut", 42, ribbonY + ribbonH / 2);
   ctx.restore();
 
-  // === FLAGS (top-left, below title) ===
-  const flagSize = 52;
-  const flagGap = 12;
-  let flagX = 30;
-  const flagY = 90;
+  // === FLAGS (inside ribbon, right side) ===
+  const flagSize = 38;
+  const flagGap = 8;
+  let flagX = 520;
+  const flagY = ribbonY + (ribbonH - flagSize * 0.67) / 2;
 
   for (const l of langs) {
     try {
       const flagImg = await loadImage(FLAG_URLS[l]);
       const fh = flagSize * 0.67;
       ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.3)";
-      ctx.shadowBlur = 6;
-      roundRect(ctx, flagX, flagY, flagSize, fh, 5);
+      roundRect(ctx, flagX, flagY, flagSize, fh, 4);
       ctx.clip();
       ctx.drawImage(flagImg, flagX, flagY, flagSize, fh);
       ctx.restore();
       ctx.save();
-      ctx.strokeStyle = "rgba(0,0,0,0.2)";
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
       ctx.lineWidth = 1.5;
-      roundRect(ctx, flagX, flagY, flagSize, fh, 5);
+      roundRect(ctx, flagX, flagY, flagSize, fh, 4);
       ctx.stroke();
       ctx.restore();
     } catch { /* skip */ }
@@ -322,18 +327,16 @@ export async function generateEtsyVisual(
 
   onProgress?.(72);
 
-  // === DIAGONAL CASCADE: bottom-left to top-right ===
-  // Order: Graded (bottom-left), Complete, Master, Grayscale (top-right)
+  // === DIAGONAL CASCADE: bottom-left to top-right, ALL STRAIGHT (rot=0) ===
   const pages = [gradedPage, completePage, masterPage, grayscalePage];
   const labels = ["Graded Set", "Complete Set", "Master Set", "Grayscale"];
   const colors = ["#ef4444", "#f97316", "#3b82f6", "#8b5cf6"];
 
-  // Each page: positioned diagonally
   const pageConfigs = [
-    { w: 420, h: 594, x: -30, y: 440, rot: -3 },   // Graded - bottom-left, largest
-    { w: 370, h: 522, x: 180, y: 280, rot: -1.5 },  // Complete
-    { w: 340, h: 480, x: 420, y: 160, rot: 1 },      // Master
-    { w: 340, h: 480, x: 660, y: 80, rot: 2.5 },     // Grayscale - top-right
+    { w: 400, h: 565, x: -15, y: 430, rot: 0 },    // Graded - bottom-left
+    { w: 360, h: 509, x: 190, y: 290, rot: 0 },     // Complete
+    { w: 340, h: 480, x: 410, y: 170, rot: 0 },     // Master
+    { w: 340, h: 480, x: 650, y: 70, rot: 0 },      // Grayscale - top-right
   ];
 
   // Draw pages back to front (rightmost first so left overlaps)
@@ -345,15 +348,14 @@ export async function generateEtsyVisual(
   // Draw badges ON TOP of all pages
   for (let i = 0; i < pages.length; i++) {
     const c = pageConfigs[i];
-    // Badge at top-center of each page
     const badgeCx = c.x + c.w / 2;
-    const badgeCy = c.y + 30;
-    drawBadge(ctx, labels[i], badgeCx, badgeCy, colors[i], c.rot);
+    const badgeCy = c.y + 28;
+    drawBadge(ctx, labels[i], badgeCx, badgeCy, colors[i], 0);
   }
 
   onProgress?.(80);
 
-  // === LOGO (centered, ON TOP of pages, large) ===
+  // === LOGO (centered, ON TOP of pages, VERY large) ===
   const logoUrl = customLogoUrl && customLogoUrl.trim() !== "" ? customLogoUrl.trim() : setDetail.logo;
   let logoImg: HTMLImageElement | null = null;
   if (logoUrl) {
@@ -361,27 +363,25 @@ export async function generateEtsyVisual(
   }
 
   if (logoImg) {
-    const maxLogoW = 650;
-    const maxLogoH = 250;
+    const maxLogoW = 750;
+    const maxLogoH = 300;
     const logoAspect = logoImg.width / logoImg.height;
     let logoW = maxLogoW;
     let logoH = logoW / logoAspect;
     if (logoH > maxLogoH) { logoH = maxLogoH; logoW = logoH * logoAspect; }
 
     const logoX = SIZE / 2 - logoW / 2;
-    const logoY = SIZE / 2 - logoH / 2 + 60;
+    const logoY = SIZE / 2 - logoH / 2 + 80;
 
-    // Strong shadow behind logo for readability
+    // Strong multi-layer shadow
     ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
-    ctx.shadowBlur = 40;
-    ctx.shadowOffsetY = 8;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+    ctx.shadowBlur = 50;
+    ctx.shadowOffsetY = 10;
     ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
     ctx.restore();
-    // Crisp logo on top
     ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
   } else {
-    // Fallback: set name centered
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
     ctx.shadowBlur = 20;
@@ -390,22 +390,34 @@ export async function generateEtsyVisual(
     ctx.font = "bold 80px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(setDetail.name, SIZE / 2, SIZE / 2 + 40);
+    ctx.fillText(setDetail.name, SIZE / 2, SIZE / 2 + 60);
     ctx.restore();
   }
 
   onProgress?.(88);
 
-  // === BOTTOM CTA: "✨ Download ✨" ===
+  // === BOTTOM CTA: styled "✨ Download ✨" button ===
   ctx.save();
-  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-  ctx.shadowBlur = 12;
-  ctx.shadowOffsetY = 4;
+  const btnW = 480;
+  const btnH = 70;
+  const btnX = SIZE / 2 - btnW / 2;
+  const btnY = SIZE - 100;
+
+  // Button shadow
+  ctx.shadowColor = "rgba(0,0,0,0.4)";
+  ctx.shadowBlur = 20;
+  ctx.shadowOffsetY = 6;
+  roundRect(ctx, btnX, btnY, btnW, btnH, 35);
   ctx.fillStyle = "#000";
-  ctx.font = "bold 64px Arial, sans-serif";
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+
+  // Button text
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 42px Arial, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("✨ Download ✨", SIZE / 2, SIZE - 60);
+  ctx.fillText("✨ Download ✨", SIZE / 2, btnY + btnH / 2);
   ctx.restore();
 
   onProgress?.(95);

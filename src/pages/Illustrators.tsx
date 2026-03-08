@@ -105,6 +105,7 @@ const Illustrators = () => {
               cards={cards}
               lang={lang}
               disabled={cards.length === 0}
+              fetchCardsForLang={selectedIllustrator ? (l) => fetchCardsByIllustrator(l, selectedIllustrator) : undefined}
             />
           </div>
         </div>

@@ -258,6 +258,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
         }
       }
     }
+    }
 
     setGeneratedFiles(files);
     setGenerating(false);

@@ -39,6 +39,7 @@ export async function loadCardWithOverlays(
     reverse?: boolean;
     reverseType?: "normal" | "pokeball" | "masterball";
     graded?: boolean;
+    grayscale?: boolean;
   }
 ): Promise<string | null> {
   try {

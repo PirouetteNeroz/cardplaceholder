@@ -149,33 +149,39 @@ const Index = () => {
 
         const cardW = 63, cardH = 88;
         const marginX = (210 - cardW * 3) / 2;
-        let x = marginX, y = 20, count = 0;
 
-        for (let i = 0; i < chunk.length; i++) {
-          const card = chunk[i];
-          const globalIdx = startIdx + i;
-          setPdfStep(`Partie ${part + 1}/${totalParts} — Carte ${globalIdx + 1} / ${processedCards.length}...`);
-          setPdfProgress(5 + ((globalIdx + 1) / processedCards.length) * 90);
-
+        // Prepare all image requests for this chunk
+        const imageRequests = chunk.map(card => {
           let localId = card.localId
             .replace("_reverse_pokeball", "")
             .replace("_reverse_masterball", "")
             .replace("_reverse", "");
           const imgUrl = `https://assets.tcgdex.net/${lang}/${setDetail.serie.id}/${setDetail.id}/${localId}/high.png`;
-
-          try {
-            const dataUrl = await loadCardWithOverlays(imgUrl, {
+          return {
+            imgUrl,
+            options: {
               reverse: card.reverse,
               reverseType: card.reverseType,
               graded: card.graded,
-            });
-            if (dataUrl) {
-              doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
-            }
-          } catch {
-            // skip
-          }
+            },
+          };
+        });
 
+        // Batch load all images in parallel
+        setPdfStep(`Partie ${part + 1}/${totalParts} — Chargement des images...`);
+        const dataUrls = await loadCardsBatch(imageRequests, 8, (loaded, total) => {
+          const globalLoaded = startIdx + loaded;
+          setPdfStep(`Partie ${part + 1}/${totalParts} — Image ${globalLoaded} / ${processedCards.length}...`);
+          setPdfProgress(5 + (globalLoaded / processedCards.length) * 90);
+        });
+
+        // Place images on PDF pages
+        let x = marginX, y = 20, count = 0;
+        for (let i = 0; i < dataUrls.length; i++) {
+          const dataUrl = dataUrls[i];
+          if (dataUrl) {
+            doc.addImage(dataUrl, "JPEG", x, y, cardW, cardH);
+          }
           x += cardW;
           count++;
           if (count % 3 === 0) {

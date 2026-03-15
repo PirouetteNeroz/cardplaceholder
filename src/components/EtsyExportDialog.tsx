@@ -269,7 +269,7 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
           const { jsPDF } = await import("jspdf");
 
           const cardsPerPage = 9;
-          const maxPagesPerPDF = 15;
+          const maxPagesPerPDF = 30;
           const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF;
           const totalParts = Math.ceil(cards.length / maxCardsPerPDF);
 

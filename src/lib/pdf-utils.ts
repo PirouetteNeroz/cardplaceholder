@@ -4,10 +4,21 @@ export const POKEBALL_LOGO_URL = "https://i.postimg.cc/k4SGC1c4/jeux.png";
 export const MASTERBALL_LOGO_URL = "https://i.postimg.cc/k45KYwxr/jeux.png";
 export const GRADED_LOGO_URL = "https://i.postimg.cc/K3mmKhcv/graded.png";
 
+const imageBitmapCache = new Map<string, ImageBitmap>();
+
 async function loadImageAsBlob(url: string): Promise<ImageBitmap> {
+  const cached = imageBitmapCache.get(url);
+  if (cached) return cached;
   const resp = await fetch(url, { mode: "cors" });
   const blob = await resp.blob();
-  return createImageBitmap(blob);
+  const bmp = await createImageBitmap(blob);
+  imageBitmapCache.set(url, bmp);
+  return bmp;
+}
+
+/** Clear the image cache (e.g. when switching sets) */
+export function clearImageCache() {
+  imageBitmapCache.clear();
 }
 
 let logosCache: {
@@ -44,9 +55,7 @@ export async function loadCardWithOverlays(
 ): Promise<string | null> {
   try {
     const logos = await preloadLogos();
-    const resp = await fetch(imgUrl, { mode: "cors" });
-    const blob = await resp.blob();
-    const img = await createImageBitmap(blob);
+    const img = await loadImageAsBlob(imgUrl);
 
     const canvas = document.createElement("canvas");
     canvas.width = img.width;

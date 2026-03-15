@@ -321,6 +321,19 @@ export async function processCards(
             }
           }
         }
+      } else if (mode === "master3reverse") {
+        // Like special but with 1 less reverse: Pokemon = 2 reverses, Dresseur = 1 reverse
+        if (isSpecial) {
+          cards.push({ ...detailed });
+        } else {
+          cards.push({ ...detailed });
+          if (detailed.variants?.reverse) {
+            cards.push({ ...detailed, reverse: true, reverseType: "normal", localId: detailed.localId + "_reverse" });
+            if (detailed.category !== "Dresseur") {
+              cards.push({ ...detailed, reverse: true, reverseType: "pokeball", localId: detailed.localId + "_reverse_pokeball" });
+            }
+          }
+        }
       }
     } catch {
       cards.push({ ...card });

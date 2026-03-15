@@ -36,6 +36,7 @@ const MODES: { value: ExportMode; label: string }[] = [
   { value: "master", label: "Master Set (avec reverses)" },
   { value: "graded", label: "Graded (excl. Common/Uncommon)" },
   { value: "special", label: "Master Set Spécial (4x reverse)" },
+  { value: "master3reverse", label: "Master Set 3 Reverse (3x Pokémon, 2x Dresseur)" },
 ];
 
 const Index = () => {

@@ -2,7 +2,7 @@
 
 export type Lang = "fr" | "en" | "de" | "es" | "it" | "pt" | "ja";
 
-export type ExportMode = "complete" | "master" | "graded" | "special";
+export type ExportMode = "complete" | "master" | "graded" | "special" | "master3reverse";
 
 export interface SeriesItem {
   id: string;
@@ -318,6 +318,19 @@ export async function processCards(
             cards.push({ ...detailed, reverse: true, reverseType: "pokeball", localId: detailed.localId + "_reverse_pokeball" });
             if (detailed.category !== "Dresseur") {
               cards.push({ ...detailed, reverse: true, reverseType: "masterball", localId: detailed.localId + "_reverse_masterball" });
+            }
+          }
+        }
+      } else if (mode === "master3reverse") {
+        // Like special but with 1 less reverse: Pokemon = 2 reverses, Dresseur = 1 reverse
+        if (isSpecial) {
+          cards.push({ ...detailed });
+        } else {
+          cards.push({ ...detailed });
+          if (detailed.variants?.reverse) {
+            cards.push({ ...detailed, reverse: true, reverseType: "normal", localId: detailed.localId + "_reverse" });
+            if (detailed.category !== "Dresseur") {
+              cards.push({ ...detailed, reverse: true, reverseType: "pokeball", localId: detailed.localId + "_reverse_pokeball" });
             }
           }
         }

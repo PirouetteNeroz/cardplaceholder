@@ -18,6 +18,7 @@ const MODES: { value: ExportMode; label: string; description: string }[] = [
   { value: "master", label: "Master Set", description: "Avec reverses pour les cartes éligibles" },
   { value: "graded", label: "Graded", description: "Exclut Common et Uncommon" },
   { value: "special", label: "Master Set Spécial", description: "4x reverse (normal, Poké Ball, Master Ball)" },
+  { value: "master3reverse", label: "Master Set 3 Reverse", description: "3x reverse Pokémon, 2x reverse Dresseur" },
 ];
 
 const AVAILABLE_LANGS: { value: Lang; label: string }[] = [

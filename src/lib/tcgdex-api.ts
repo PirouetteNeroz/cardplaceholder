@@ -2,7 +2,7 @@
 
 export type Lang = "fr" | "en" | "de" | "es" | "it" | "pt" | "ja";
 
-export type ExportMode = "complete" | "master" | "graded" | "special";
+export type ExportMode = "complete" | "master" | "graded" | "special" | "master3reverse";
 
 export interface SeriesItem {
   id: string;

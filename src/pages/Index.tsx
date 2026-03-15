@@ -19,7 +19,7 @@ import { EtsyExportDialog } from "@/components/EtsyExportDialog";
 import { Loader2, Download, BookOpen, Layers, Paintbrush } from "lucide-react";
 import { toast } from "sonner";
 import { NavLink } from "@/components/NavLink";
-import { loadCardWithOverlays } from "@/lib/pdf-utils";
+import { loadCardsBatch } from "@/lib/pdf-utils";
 
 const LANGS: { value: Lang; label: string }[] = [
   { value: "fr", label: "Français" },

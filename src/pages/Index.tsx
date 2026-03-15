@@ -143,7 +143,6 @@ const Index = () => {
           doc.text(`Mode: ${MODES.find(m => m.value === mode)?.label}`, 30, 210);
           doc.text(`Cartes: ${processedCards.length}`, 30, 220);
           doc.text(`Langue: ${lang.toUpperCase()}`, 30, 230);
-          if (totalParts > 1) doc.text(`Partie ${part + 1} / ${totalParts}`, 30, 240);
           doc.addPage();
         }
 

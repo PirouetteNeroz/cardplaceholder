@@ -33,10 +33,6 @@ export async function preloadLogos() {
  * Loads a card image and composites overlay logos (reverse/graded) onto it.
  * Returns a dataURL ready for jsPDF.
  */
-// Target size for PDF cards (63x88mm at ~150dpi) — no need for full-res images
-const TARGET_W = 374;
-const TARGET_H = 520;
-
 export async function loadCardWithOverlays(
   imgUrl: string,
   options: {
@@ -53,10 +49,10 @@ export async function loadCardWithOverlays(
     const img = await createImageBitmap(blob);
 
     const canvas = document.createElement("canvas");
-    canvas.width = TARGET_W;
-    canvas.height = TARGET_H;
+    canvas.width = img.width;
+    canvas.height = img.height;
     const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(img, 0, 0, TARGET_W, TARGET_H);
+    ctx.drawImage(img, 0, 0);
 
     // Reverse logo overlay
     if (options.reverse) {
@@ -66,15 +62,15 @@ export async function loadCardWithOverlays(
       else logo = logos.reverse;
 
       if (logo) {
-        const logoW = TARGET_W * 0.6;
+        const logoW = img.width * 0.6;
         const logoH = (logo.height / logo.width) * logoW;
-        ctx.drawImage(logo, (TARGET_W - logoW) / 2, (TARGET_H - logoH) / 2 + (150 * TARGET_H / img.height), logoW, logoH);
+        ctx.drawImage(logo, (img.width - logoW) / 2, (img.height - logoH) / 2 + 150, logoW, logoH);
       }
     }
 
     // Graded logo overlay
     if (options.graded && logos.graded) {
-      const logoW = TARGET_W * 0.5;
+      const logoW = img.width * 0.5;
       const logoH = (logos.graded.height / logos.graded.width) * logoW;
       ctx.drawImage(logos.graded, 5, 5, logoW, logoH);
     }
@@ -92,28 +88,8 @@ export async function loadCardWithOverlays(
       ctx.putImageData(imageData, 0, 0);
     }
 
-    return canvas.toDataURL("image/jpeg", 0.85);
+    return canvas.toDataURL("image/png");
   } catch {
     return null;
   }
-}
-
-/**
- * Load multiple cards in parallel batches for faster PDF generation.
- */
-export async function loadCardsBatch(
-  cards: { imgUrl: string; options: { reverse?: boolean; reverseType?: "normal" | "pokeball" | "masterball"; graded?: boolean; grayscale?: boolean } }[],
-  batchSize = 6,
-  onProgress?: (loaded: number, total: number) => void,
-): Promise<(string | null)[]> {
-  const results: (string | null)[] = new Array(cards.length).fill(null);
-  for (let i = 0; i < cards.length; i += batchSize) {
-    const batch = cards.slice(i, i + batchSize);
-    const batchResults = await Promise.all(
-      batch.map(c => loadCardWithOverlays(c.imgUrl, c.options))
-    );
-    batchResults.forEach((r, j) => { results[i + j] = r; });
-    onProgress?.(Math.min(i + batchSize, cards.length), cards.length);
-  }
-  return results;
 }

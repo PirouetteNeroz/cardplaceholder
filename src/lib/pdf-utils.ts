@@ -55,9 +55,7 @@ export async function loadCardWithOverlays(
 ): Promise<string | null> {
   try {
     const logos = await preloadLogos();
-    const resp = await fetch(imgUrl, { mode: "cors" });
-    const blob = await resp.blob();
-    const img = await createImageBitmap(blob);
+    const img = await loadImageAsBlob(imgUrl);
 
     const canvas = document.createElement("canvas");
     canvas.width = img.width;

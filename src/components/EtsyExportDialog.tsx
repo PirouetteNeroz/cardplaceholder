@@ -281,23 +281,23 @@ export function EtsyExportDialog({ setDetail, lang, disabled }: Props) {
             const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
             const pageCanvases: string[] = [];
 
-            // Cover page
-            doc.setFontSize(32);
-            doc.setFont("helvetica", "bold");
-            doc.text(langSetDetail.name, 105, 60, { align: "center" });
-            doc.setFontSize(18);
-            doc.setFont("helvetica", "normal");
-            doc.text("Collection Pokémon", 105, 75, { align: "center" });
-            doc.setFontSize(14);
-            doc.text(`Série: ${langSetDetail.serie.name}`, 30, 200);
-            doc.text(`Mode: ${MODES.find(m => m.value === mode)?.label}`, 30, 210);
-            doc.text(`Cartes: ${cards.length}`, 30, 220);
-            doc.text(`Langue: ${pdfLang.toUpperCase()}`, 30, 230);
-            if (totalParts > 1) doc.text(`Partie ${part + 1} / ${totalParts}`, 30, 240);
-            
-            // Capture cover page preview
-            pageCanvases.push(doc.output("datauristring"));
-            doc.addPage();
+            // Cover page — only for part 0
+            if (part === 0) {
+              doc.setFontSize(32);
+              doc.setFont("helvetica", "bold");
+              doc.text(langSetDetail.name, 105, 60, { align: "center" });
+              doc.setFontSize(18);
+              doc.setFont("helvetica", "normal");
+              doc.text("Collection Pokémon", 105, 75, { align: "center" });
+              doc.setFontSize(14);
+              doc.text(`Série: ${langSetDetail.serie.name}`, 30, 200);
+              doc.text(`Mode: ${MODES.find(m => m.value === mode)?.label}`, 30, 210);
+              doc.text(`Cartes: ${cards.length}`, 30, 220);
+              doc.text(`Langue: ${pdfLang.toUpperCase()}`, 30, 230);
+              
+              pageCanvases.push(doc.output("datauristring"));
+              doc.addPage();
+            }
 
             const cardW = 63, cardH = 88;
             const marginX = (210 - cardW * 3) / 2;

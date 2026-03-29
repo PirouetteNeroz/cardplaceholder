@@ -130,7 +130,7 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
   const setIds = [...new Set(filtered.map((c) => c.id.replace(/-[^-]+$/, "")))];
 
   // Fetch set details for release dates and serie names
-  const setInfoMap: Record<string, { releaseDate: string; setName: string; serieName: string }> = {};
+  const setInfoMap: Record<string, { releaseDate: string; setName: string; serieName: string; serieId: string }> = {};
   await Promise.all(
     setIds.map(async (setId) => {
       try {
@@ -139,9 +139,10 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
           releaseDate: (setDetail as any).releaseDate || "9999-12-31",
           setName: setDetail.name,
           serieName: setDetail.serie.name,
+          serieId: (setDetail.serie as any).id || "",
         };
       } catch {
-        setInfoMap[setId] = { releaseDate: "9999-12-31", setName: setId, serieName: "" };
+        setInfoMap[setId] = { releaseDate: "9999-12-31", setName: setId, serieName: "", serieId: "" };
       }
     })
   );

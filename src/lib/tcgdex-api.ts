@@ -116,6 +116,7 @@ export interface CardListItem {
   image?: string;
   setName?: string;
   serieName?: string;
+  serieId?: string;
   releaseDate?: string;
 }
 

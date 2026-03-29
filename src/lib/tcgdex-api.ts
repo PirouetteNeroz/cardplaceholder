@@ -158,7 +158,7 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
   }
 
   // Filter out "Jeu de Cartes à Collectionner" / "Trading Card Game" series
-  const EXCLUDED_SERIES = ["jeu de cartes à collectionner", "trading card game", "sammelkartenspiel"];
+  const EXCLUDED_SERIES = ["jeu de cartes à collectionner", "trading card game", "sammelkartenspiel", "pokémon pocket", "pokemon pocket"];
   filtered = filtered.filter((c) => {
     const sn = (c.serieName || "").toLowerCase();
     return !EXCLUDED_SERIES.some((ex) => sn.includes(ex));

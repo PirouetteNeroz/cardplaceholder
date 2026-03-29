@@ -116,6 +116,7 @@ export interface CardListItem {
   image?: string;
   setName?: string;
   serieName?: string;
+  serieId?: string;
   releaseDate?: string;
 }
 
@@ -130,7 +131,7 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
   const setIds = [...new Set(filtered.map((c) => c.id.replace(/-[^-]+$/, "")))];
 
   // Fetch set details for release dates and serie names
-  const setInfoMap: Record<string, { releaseDate: string; setName: string; serieName: string }> = {};
+  const setInfoMap: Record<string, { releaseDate: string; setName: string; serieName: string; serieId: string }> = {};
   await Promise.all(
     setIds.map(async (setId) => {
       try {
@@ -139,9 +140,10 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
           releaseDate: (setDetail as any).releaseDate || "9999-12-31",
           setName: setDetail.name,
           serieName: setDetail.serie.name,
+          serieId: (setDetail.serie as any).id || "",
         };
       } catch {
-        setInfoMap[setId] = { releaseDate: "9999-12-31", setName: setId, serieName: "" };
+        setInfoMap[setId] = { releaseDate: "9999-12-31", setName: setId, serieName: "", serieId: "" };
       }
     })
   );
@@ -153,15 +155,17 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
     if (info) {
       card.setName = info.setName;
       card.serieName = info.serieName;
+      card.serieId = info.serieId;
       card.releaseDate = info.releaseDate;
     }
   }
 
-  // Filter out "Jeu de Cartes à Collectionner" / "Trading Card Game" series
-  const EXCLUDED_SERIES = ["jeu de cartes à collectionner", "trading card game", "sammelkartenspiel", "pokémon pocket", "pokemon pocket"];
+  // Filter out Pocket (serie id "tcgp") and generic TCG series by name
+  const EXCLUDED_SERIES_NAMES = ["jeu de cartes à collectionner", "trading card game", "sammelkartenspiel"];
   filtered = filtered.filter((c) => {
+    if (c.serieId === "tcgp") return false;
     const sn = (c.serieName || "").toLowerCase();
-    return !EXCLUDED_SERIES.some((ex) => sn.includes(ex));
+    return !EXCLUDED_SERIES_NAMES.some((ex) => sn.includes(ex));
   });
 
   // Sort by release date, then by localId within same set

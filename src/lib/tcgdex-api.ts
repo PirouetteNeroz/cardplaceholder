@@ -155,15 +155,17 @@ export async function fetchCardsByIllustrator(lang: Lang, illustrator: string): 
     if (info) {
       card.setName = info.setName;
       card.serieName = info.serieName;
+      card.serieId = info.serieId;
       card.releaseDate = info.releaseDate;
     }
   }
 
-  // Filter out "Jeu de Cartes à Collectionner" / "Trading Card Game" series
-  const EXCLUDED_SERIES = ["jeu de cartes à collectionner", "trading card game", "sammelkartenspiel", "pokémon pocket", "pokemon pocket"];
+  // Filter out Pocket (serie id "tcgp") and generic TCG series by name
+  const EXCLUDED_SERIES_NAMES = ["jeu de cartes à collectionner", "trading card game", "sammelkartenspiel"];
   filtered = filtered.filter((c) => {
+    if (c.serieId === "tcgp") return false;
     const sn = (c.serieName || "").toLowerCase();
-    return !EXCLUDED_SERIES.some((ex) => sn.includes(ex));
+    return !EXCLUDED_SERIES_NAMES.some((ex) => sn.includes(ex));
   });
 
   // Sort by release date, then by localId within same set

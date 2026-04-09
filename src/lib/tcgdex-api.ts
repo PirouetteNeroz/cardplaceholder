@@ -283,6 +283,24 @@ export function getCardImageUrl(lang: Lang, serieId: string, setId: string, loca
   return `https://assets.tcgdex.net/${lang}/${serieId}/${setId}/${localId}/high.png`;
 }
 
+// Determine if a card should have reverse variants
+// Force reverse for non-special cards even if the API doesn't report it
+function shouldHaveReverse(detailed: CardItem, isSpecial: boolean): boolean {
+  if (isSpecial) return false;
+  // If the API says reverse exists, trust it
+  if (detailed.variants?.reverse) return true;
+  // Force reverse for common/uncommon/rare cards that the API might not have updated yet
+  const REVERSE_ELIGIBLE_RARITIES = [
+    "Common", "Commune", "Häufig",
+    "Uncommon", "Peu Commune", "Ungewöhnlich",
+    "Rare", "Selten",
+    "ACE SPEC Rare",
+    "HIGH-TECG rare",
+  ];
+  if (!detailed.rarity) return true; // No rarity info = assume eligible
+  return REVERSE_ELIGIBLE_RARITIES.some(r => r.toLowerCase() === (detailed.rarity || "").toLowerCase());
+}
+
 export async function processCards(
   lang: Lang,
   set: SetDetail,
@@ -302,10 +320,11 @@ export async function processCards(
     try {
       const detailed = await fetchCardDetail(lang, card.id);
       const isSpecial = detailed.rarity && SPECIAL_RARITIES.includes(detailed.rarity);
+      const hasReverse = shouldHaveReverse(detailed, !!isSpecial);
 
       if (mode === "master") {
         cards.push({ ...detailed });
-        if (!isSpecial && detailed.variants?.reverse) {
+        if (hasReverse) {
           cards.push({ ...detailed, reverse: true, localId: detailed.localId + "_reverse" });
         }
       } else if (mode === "graded") {
@@ -317,7 +336,7 @@ export async function processCards(
           cards.push({ ...detailed });
         } else {
           cards.push({ ...detailed });
-          if (detailed.variants?.reverse) {
+          if (hasReverse) {
             cards.push({ ...detailed, reverse: true, reverseType: "normal", localId: detailed.localId + "_reverse" });
             cards.push({ ...detailed, reverse: true, reverseType: "pokeball", localId: detailed.localId + "_reverse_pokeball" });
             if (detailed.category !== "Dresseur") {
@@ -326,12 +345,11 @@ export async function processCards(
           }
         }
       } else if (mode === "master3reverse") {
-        // Like special but with 1 less reverse: Pokemon = 2 reverses, Dresseur = 1 reverse
         if (isSpecial) {
           cards.push({ ...detailed });
         } else {
           cards.push({ ...detailed });
-          if (detailed.variants?.reverse) {
+          if (hasReverse) {
             cards.push({ ...detailed, reverse: true, reverseType: "normal", localId: detailed.localId + "_reverse" });
             if (detailed.category !== "Dresseur") {
               cards.push({ ...detailed, reverse: true, reverseType: "pokeball", localId: detailed.localId + "_reverse_pokeball" });

@@ -126,8 +126,10 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
         try {
           const { jsPDF } = await import("jspdf");
           const cardsPerPage = 9;
-          const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF;
-          const totalParts = Math.ceil(langCards.length / maxCardsPerPDF);
+          // For Pokémon entities: always 1 single PDF (no fragmentation)
+          const isPokemonEntity = entityLabel === "Pokémon";
+          const maxCardsPerPDF = isPokemonEntity ? langCards.length : cardsPerPage * maxPagesPerPDF;
+          const totalParts = isPokemonEntity ? 1 : Math.ceil(langCards.length / maxCardsPerPDF);
 
           for (let part = 0; part < totalParts; part++) {
             const startIdx = part * maxCardsPerPDF;

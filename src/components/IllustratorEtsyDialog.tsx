@@ -126,8 +126,10 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
         try {
           const { jsPDF } = await import("jspdf");
           const cardsPerPage = 9;
-          const maxCardsPerPDF = cardsPerPage * maxPagesPerPDF;
-          const totalParts = Math.ceil(langCards.length / maxCardsPerPDF);
+          // For Pokémon entities: always 1 single PDF (no fragmentation)
+          const isPokemonEntity = entityLabel === "Pokémon";
+          const maxCardsPerPDF = isPokemonEntity ? langCards.length : cardsPerPage * maxPagesPerPDF;
+          const totalParts = isPokemonEntity ? 1 : Math.ceil(langCards.length / maxCardsPerPDF);
 
           for (let part = 0; part < totalParts; part++) {
             const startIdx = part * maxCardsPerPDF;
@@ -288,18 +290,20 @@ export function IllustratorEtsyDialog({ entityName, entityLabel = "Illustrateur"
 
         {!generating && generatedFiles.length === 0 && (
           <div className="space-y-4 py-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="maxPagesEtsy" className="text-xs text-muted-foreground whitespace-nowrap">Pages max/PDF</Label>
-              <Input
-                id="maxPagesEtsy"
-                type="number"
-                min={1}
-                max={50}
-                value={maxPagesPerPDF}
-                onChange={(e) => setMaxPagesPerPDF(Math.max(1, parseInt(e.target.value) || 6))}
-                className="w-[70px] h-9"
-              />
-            </div>
+            {entityLabel !== "Pokémon" && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="maxPagesEtsy" className="text-xs text-muted-foreground whitespace-nowrap">Pages max/PDF</Label>
+                <Input
+                  id="maxPagesEtsy"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={maxPagesPerPDF}
+                  onChange={(e) => setMaxPagesPerPDF(Math.max(1, parseInt(e.target.value) || 6))}
+                  className="w-[70px] h-9"
+                />
+              </div>
+            )}
 
             <div>
               <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">

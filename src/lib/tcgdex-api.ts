@@ -196,44 +196,90 @@ const POKEMON_SUFFIXES = [
   " Hisuian", " Alolan", " Galarian", " Paldean",
 ];
 
-function extractBasePokemonName(name: string): string {
+// Strip a single trailer (suffix forms, gender, etc.) from one token
+function stripTrailers(name: string): string {
   let base = name.trim();
-  // Remove common suffixes
-  for (const suffix of POKEMON_SUFFIXES) {
-    if (base.endsWith(suffix)) {
-      base = base.slice(0, -suffix.length).trim();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const suffix of POKEMON_SUFFIXES) {
+      if (base.endsWith(suffix)) {
+        base = base.slice(0, -suffix.length).trim();
+        changed = true;
+      }
     }
   }
-  // Remove trailing special characters and numbers like "♀", "♂", numbers
   base = base.replace(/[\s]*(♀|♂)$/, "").trim();
   return base;
+}
+
+// Strip possessive prefixes like "Misty's ", "Ondine's ", "Sacha's ", "Pierre's ", "N's ", "Team Rocket's "
+function stripPossessivePrefix(name: string): string {
+  // Matches "<Trainer>'s ", "<Trainer>’s ", or "<Trainer> de " (FR), keep only what comes after
+  const patterns = [
+    /^.+?['’]s\s+/i,         // EN/most: "Misty's Psyduck"
+    /^.+?\sde\s+/i,          // FR: "Psyduck de Ondine" -> handled below differently
+  ];
+  for (const re of patterns) {
+    const m = name.match(re);
+    if (m) {
+      // Only strip the "'s" form aggressively; "de" is risky -> only if first token is capitalized trainer
+      if (re.source.includes("['’]s")) {
+        return name.slice(m[0].length).trim();
+      }
+    }
+  }
+  return name;
+}
+
+// Returns ALL base Pokémon names contained in a card name.
+// Handles: suffixes (ex/V/VMAX...), possessive prefixes ("Misty's Psyduck"),
+// and combined names ("Slowpoke & Psyduck", "Slowpoke et Psyduck", "Slowpoke und Psyduck").
+function extractBasePokemonNames(name: string): string[] {
+  const cleaned = stripPossessivePrefix(name.trim());
+  // Split on combiner tokens
+  const parts = cleaned.split(/\s+(?:&|et|und|y|e|and)\s+/i);
+  const result: string[] = [];
+  for (const p of parts) {
+    const base = stripTrailers(stripPossessivePrefix(p));
+    if (base) result.push(base);
+  }
+  return result.length > 0 ? result : [stripTrailers(cleaned)];
+}
+
+// Backwards-compatible single-name extraction (primary base name)
+function extractBasePokemonName(name: string): string {
+  return extractBasePokemonNames(name)[0] || name.trim();
 }
 
 export async function fetchPokemonNames(lang: Lang): Promise<string[]> {
   const res = await fetch(`${BASE_URL}/${lang}/cards`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const cards: { id: string; name: string }[] = await res.json();
-  // Filter out Pokémon Pocket cards and extract unique BASE names
+  // Filter out Pokémon Pocket cards and extract ALL unique BASE names
   const names = new Set<string>();
   for (const c of cards) {
     if (!c.id.startsWith("tcgp-")) {
-      names.add(extractBasePokemonName(c.name));
+      for (const n of extractBasePokemonNames(c.name)) {
+        names.add(n);
+      }
     }
   }
   return [...names].sort((a, b) => a.localeCompare(b));
 }
 
 export async function fetchCardsByPokemonName(lang: Lang, baseName: string): Promise<CardListItem[]> {
-  // Fetch all cards and filter by base name match
+  // Fetch all cards and filter by base name match (a card may match via multiple names)
   const res = await fetch(`${BASE_URL}/${lang}/cards`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const allCards: CardListItem[] = await res.json();
-  
-  // Filter cards whose base name matches the requested base name
+
+  const target = baseName.toLowerCase();
+  // Filter cards whose extracted base names include the requested base name
   let filtered = allCards.filter((c) => {
     if (c.id.startsWith("tcgp-")) return false;
-    const cardBaseName = extractBasePokemonName(c.name);
-    return cardBaseName.toLowerCase() === baseName.toLowerCase();
+    const bases = extractBasePokemonNames(c.name).map(b => b.toLowerCase());
+    return bases.includes(target);
   });
 
   const setIds = [...new Set(filtered.map((c) => c.id.replace(/-[^-]+$/, "")))];

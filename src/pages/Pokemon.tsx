@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { fetchPokemonNames, fetchCardsByPokemonName, type Lang, type CardListItem } from "@/lib/tcgdex-api";
+import { fetchPokemonNames, fetchCardsByPokemonName, getAllJaEnAliases, type Lang, type CardListItem } from "@/lib/tcgdex-api";
 import { Loader2, Search, ArrowLeft, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { NavLink } from "@/components/NavLink";

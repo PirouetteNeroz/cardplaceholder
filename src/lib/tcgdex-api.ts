@@ -252,6 +252,59 @@ function extractBasePokemonName(name: string): string {
   return extractBasePokemonNames(name)[0] || name.trim();
 }
 
+// Cache for JA -> EN name aliases (built once per session)
+// Maps a JA base Pokémon name (lowercased) to a set of EN base names (lowercased)
+let jaToEnAliasCache: Map<string, Set<string>> | null = null;
+
+async function buildJaEnAliasMap(): Promise<Map<string, Set<string>>> {
+  if (jaToEnAliasCache) return jaToEnAliasCache;
+  const [jaRes, enRes] = await Promise.all([
+    fetch(`${BASE_URL}/ja/cards`),
+    fetch(`${BASE_URL}/en/cards`),
+  ]);
+  if (!jaRes.ok || !enRes.ok) {
+    jaToEnAliasCache = new Map();
+    return jaToEnAliasCache;
+  }
+  const jaCards: { id: string; name: string }[] = await jaRes.json();
+  const enCards: { id: string; name: string }[] = await enRes.json();
+  const enById = new Map<string, string>();
+  for (const c of enCards) enById.set(c.id, c.name);
+
+  const map = new Map<string, Set<string>>();
+  for (const c of jaCards) {
+    if (c.id.startsWith("tcgp-")) continue;
+    const enName = enById.get(c.id);
+    if (!enName) continue;
+    const jaBases = extractBasePokemonNames(c.name);
+    const enBases = extractBasePokemonNames(enName);
+    for (const ja of jaBases) {
+      const key = ja.toLowerCase();
+      let set = map.get(key);
+      if (!set) { set = new Set(); map.set(key, set); }
+      for (const en of enBases) set.add(en.toLowerCase());
+    }
+  }
+  jaToEnAliasCache = map;
+  return map;
+}
+
+// Get search aliases for a JA base name (returns lowercased EN aliases, may be empty)
+export async function getPokemonSearchAliases(lang: Lang, baseName: string): Promise<string[]> {
+  if (lang !== "ja") return [];
+  const map = await buildJaEnAliasMap();
+  const set = map.get(baseName.toLowerCase());
+  return set ? [...set] : [];
+}
+
+// Bulk variant: returns a Map<jaBaseNameLower, string[] of EN aliases lowercased>
+export async function getAllJaEnAliases(): Promise<Map<string, string[]>> {
+  const map = await buildJaEnAliasMap();
+  const out = new Map<string, string[]>();
+  for (const [k, v] of map) out.set(k, [...v]);
+  return out;
+}
+
 export async function fetchPokemonNames(lang: Lang): Promise<string[]> {
   const res = await fetch(`${BASE_URL}/${lang}/cards`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -264,6 +317,10 @@ export async function fetchPokemonNames(lang: Lang): Promise<string[]> {
         names.add(n);
       }
     }
+  }
+  // Pre-warm the JA->EN alias cache so search-by-EN works immediately
+  if (lang === "ja") {
+    buildJaEnAliasMap().catch(() => {});
   }
   return [...names].sort((a, b) => a.localeCompare(b));
 }

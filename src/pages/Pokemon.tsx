@@ -28,6 +28,8 @@ const Pokemon = () => {
   const [cards, setCards] = useState<CardListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingCards, setLoadingCards] = useState(false);
+  // JA -> EN aliases for cross-language search (only populated when lang === "ja")
+  const [jaAliases, setJaAliases] = useState<Map<string, string[]>>(new Map());
 
   const handleLoad = useCallback(async () => {
     setLoading(true);
@@ -36,11 +38,21 @@ const Pokemon = () => {
     setSelectedPokemon(null);
     setCards([]);
     setSearch("");
+    setJaAliases(new Map());
     try {
       const data = await fetchPokemonNames(lang);
       setPokemonNames(data);
       setFilteredNames(data);
       toast.success(`${data.length} Pokémon chargés`);
+      // Load EN aliases for JA so users can search in English
+      if (lang === "ja") {
+        try {
+          const aliases = await getAllJaEnAliases();
+          setJaAliases(aliases);
+        } catch (e) {
+          console.warn("Impossible de charger les alias EN", e);
+        }
+      }
     } catch (e) {
       toast.error("Erreur lors du chargement des Pokémon");
       console.error(e);
@@ -52,7 +64,16 @@ const Pokemon = () => {
     setSearch(value);
     const q = value.toLowerCase();
     setFilteredNames(
-      pokemonNames.filter((name) => name.toLowerCase().includes(q))
+      pokemonNames.filter((name) => {
+        const n = name.toLowerCase();
+        if (n.includes(q)) return true;
+        // For JA, also match against EN aliases
+        if (lang === "ja") {
+          const aliases = jaAliases.get(n);
+          if (aliases && aliases.some((a) => a.includes(q))) return true;
+        }
+        return false;
+      })
     );
   };
 
